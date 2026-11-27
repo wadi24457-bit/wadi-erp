@@ -276,11 +276,12 @@ function moreView(){
   shell(`
     <div class="page-title">المزيد</div>
     <div class="cards">
-      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٣ — الحسابات والخزائن</div></div>
+      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٤ — المصروفات والموظفون والسلف</div></div>
       <div class="card"><div class="k">العملة الأساسية</div><div class="v" style="font-size:1rem">جنيه مصري (EGP)</div></div>
     </div>
-    <div class="card" style="margin-top:1rem"><div class="k">قريباً</div>
-      <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">المصروفات والسلف والموظفون (المرحلة التالية) · العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
+    <div class="card" style="margin-top:1rem"><div class="k">الأقسام</div>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#hr" style="color:var(--emerald-d)">🧑‍💼 الموظفون والموارد البشرية والسلف ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">قريباً: العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
     </div>`, 'more');
 }
 
@@ -294,6 +295,7 @@ function finHome(){
     return shell(`<div class="page-title">المالية</div><div class="empty">لا تملك صلاحية الوصول إلى المالية.</div>`, 'fin');
   const items = [
     ['fin/vouchers','سندات القبض والصرف','🧾','treasury.manage','تسجيل المقبوضات والمدفوعات مع قيد محاسبي تلقائي'],
+    ['fin/expenses','المصروفات والميزانية','💸','expenses.view','مصروفات مصنّفة بمصدر دفع إلزامي ومقارنة بالميزانية'],
     ['fin/cashboxes','الخزائن والبنوك','🏦','treasury.manage','إدارة الخزائن ومتابعة أرصدتها'],
     ['fin/journals','القيود اليومية','📒','accounting.view','قيود مزدوجة مع اعتماد ومنع تعديل بعد الاعتماد'],
     ['fin/accounts','دليل الحسابات','🗂️','accounting.view','شجرة الحسابات والأرصدة'],
@@ -572,6 +574,339 @@ async function trialView(){
     </table></div>`, 'fin');
 }
 
+const EXP_CATS = ['إيجارات','رواتب','نقل ومواصلات','شحن','جمارك','مشتريات تشغيلية','صيانة','اتصالات وإنترنت','مصروفات إدارية','مصروفات تسويقية','مصروفات أخرى'];
+
+async function expensesView(){
+  if(!can('expenses.view') && !can('expenses.manage')) return shell(`<div class="page-title">المصروفات</div><div class="empty">لا تملك الصلاحية.</div>`, 'fin');
+  shell(`<div class="page-title">المصروفات</div><div class="center"><span class="spin"></span></div>`, 'fin');
+  const month = new Date().toISOString().slice(0,7);
+  const [{ data: exps }, { data: boxes }, { data: cmp }] = await Promise.all([
+    sb.from('expenses').select('*, cashboxes(name)').is('deleted_at', null).order('created_at', {ascending:false}).limit(100),
+    sb.from('cashboxes').select('*').eq('is_active', true).is('deleted_at', null),
+    sb.from('v_budget_compare').select('*').eq('month', month),
+  ]);
+  const rows = (exps||[]).map(e => `
+    <tr><td dir="ltr" style="text-align:right">${esc(e.ref_no)}</td><td>${new Date(e.date).toLocaleDateString('ar-EG')}</td>
+    <td>${esc(e.category)}</td><td><b>${fmt(e.amount)} ${esc(e.currency)}</b></td>
+    <td>${esc(e.cashboxes?.name||'—')}</td><td>${esc(e.responsible||'')}</td>
+    <td style="font-size:.78rem;color:var(--muted)">${esc(e.notes||'')}</td></tr>`).join('');
+  const cmpRows = (cmp||[]).map(b => {
+    const pct = b.budget > 0 ? Math.round(b.actual / b.budget * 100) : 0;
+    return `<tr><td>${esc(b.category)}</td><td>${money(b.budget)}</td><td>${money(b.actual)}</td>
+      <td class="${pct > 100 ? 'neg' : pct > 80 ? '' : 'em'}">${pct}٪</td></tr>`;
+  }).join('');
+  shell(`
+    <div class="page-title">المصروفات</div>
+    <div class="toolbar">
+      ${can('expenses.manage') ? '<button class="btn" id="addE">+ مصروف جديد</button> <button class="btn ghost" id="setB">ميزانية شهرية</button>' : ''}
+      <a class="btn ghost" href="#fin">← المالية</a>
+    </div>
+    <div id="msg"></div>
+    ${cmpRows ? `<div class="card" style="margin-bottom:1rem"><div class="k">ميزانية هذا الشهر مقابل الفعلي</div>
+      <div class="tablewrap" style="margin-top:.5rem"><table><thead><tr><th>التصنيف</th><th>الميزانية</th><th>الفعلي</th><th>النسبة</th></tr></thead><tbody>${cmpRows}</tbody></table></div></div>` : ''}
+    <div class="tablewrap"><table>
+      <thead><tr><th>المرجع</th><th>التاريخ</th><th>التصنيف</th><th>المبلغ</th><th>مصدر الدفع</th><th>المسؤول</th><th>ملاحظات</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="empty">لا توجد مصروفات بعد</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'fin');
+  if(can('expenses.manage')){
+    $('#addE').onclick = () => expenseForm(boxes||[]);
+    $('#setB').onclick = () => budgetForm(month);
+  }
+}
+
+function expenseForm(boxes){
+  if(!boxes.length){ $('#msg').innerHTML = `<div class="msg err">أضف خزينة أولاً — لا يُسجَّل مصروف دون مصدر دفع.</div>`; return; }
+  $('#modal').innerHTML = `
+  <div class="modal-bg"><div class="modal">
+    <h3>مصروف جديد</h3><div id="mmsg"></div>
+    <div class="field"><label>التصنيف</label><select id="e_cat">${EXP_CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
+    <div class="field"><label>التاريخ</label><input id="e_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>المبلغ</label><input id="e_amount" type="number" min="0" step="0.01" dir="ltr"></div>
+    <div class="field"><label>مصدر الدفع (الخزينة) — إلزامي</label><select id="e_box">${boxes.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>طريقة الدفع</label><select id="e_method"><option>نقدي</option><option>تحويل بنكي</option><option>شيك</option><option>بطاقة</option></select></div>
+    <div class="field"><label>المسؤول</label><input id="e_resp" value="${esc(profile.full_name)}"></div>
+    <div class="field"><label>ملاحظات</label><input id="e_notes"></div>
+    <p style="font-size:.8rem;color:var(--muted)">يُنشأ قيد تلقائي: حساب المصروف مدين والخزينة دائن، مع منع الصرف فوق الرصيد.</p>
+    <button class="btn" id="saveE">حفظ</button>
+    <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button>
+  </div></div>`;
+  $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  $('#saveE').onclick = async () => {
+    const amount = Number($('#e_amount').value);
+    if(!amount || amount <= 0){ $('#mmsg').innerHTML = `<div class="msg err">أدخل مبلغاً صحيحاً.</div>`; return; }
+    const { error } = await sb.from('expenses').insert({
+      category: $('#e_cat').value, date: $('#e_date').value, amount,
+      payment_method: $('#e_method').value, cashbox_id: $('#e_box').value,
+      responsible: $('#e_resp').value.trim(), notes: $('#e_notes').value.trim(), created_by: session.user.id });
+    if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    $('#modal').innerHTML = ''; expensesView();
+  };
+}
+
+function budgetForm(month){
+  $('#modal').innerHTML = `
+  <div class="modal-bg"><div class="modal">
+    <h3>ميزانية شهر ${month}</h3><div id="mmsg"></div>
+    <div class="field"><label>التصنيف</label><select id="b_cat">${EXP_CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
+    <div class="field"><label>المبلغ المخطط</label><input id="b_amount" type="number" min="0" step="0.01" dir="ltr"></div>
+    <button class="btn" id="saveB">حفظ الميزانية</button>
+    <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button>
+  </div></div>`;
+  $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  $('#saveB').onclick = async () => {
+    const { error } = await sb.from('budgets').upsert({
+      month, category: $('#b_cat').value, amount: Number($('#b_amount').value) || 0, created_by: session.user.id }, { onConflict: 'month,category,branch_id' });
+    if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    $('#modal').innerHTML = ''; expensesView();
+  };
+}
+
+/* ---------- HR (phase 4) ---------- */
+function hrHome(){
+  if(!can('hr.view') && !can('hr.manage') && !can('advances.manage'))
+    return shell(`<div class="page-title">الموظفون</div><div class="empty">لا تملك صلاحية الوصول إلى الموارد البشرية.</div>`, 'more');
+  const items = [
+    ['hr/employees','الموظفون','🧑‍💼','hr.view','البيانات والرواتب وحالة التوظيف'],
+    ['hr/attendance','الحضور والانصراف','🕐','hr.view','تسجيل حضور اليوم'],
+    ['hr/leaves','الإجازات','🌴','hr.view','طلبات الإجازة والموافقات'],
+    ['hr/advances','السلف والقروض','🤝','hr.view','طلب → اعتماد → صرف → أقساط'],
+  ].filter(([, , , p]) => can(p) || can('hr.manage'));
+  shell(`
+    <div class="page-title">الموظفون والموارد البشرية</div>
+    <div class="cards">
+      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+    </div>`, 'more');
+}
+
+async function employeesView(){
+  if(!can('hr.view') && !can('hr.manage')) return shell(`<div class="page-title">الموظفون</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">الموظفون</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const { data } = await sb.from('employees').select('*').is('deleted_at', null).order('created_at', {ascending:false});
+  const rows = (data||[]).map(e => `
+    <tr><td><b>${esc(e.name)}</b><br><span style="color:var(--muted);font-size:.78rem" dir="ltr">${esc(e.code)}</span></td>
+    <td>${esc(e.job_title||'—')}<br><span style="color:var(--muted);font-size:.78rem">${esc(e.department||'')}</span></td>
+    <td>${money(e.base_salary)}</td>
+    <td>${e.is_active ? '<span class="badge green">نشط</span>' : '<span class="badge red">منتهي</span>'}</td>
+    <td class="row-actions">${can('hr.manage') ? `<button data-edit="${e.id}">تعديل</button>` : ''}</td></tr>`).join('');
+  shell(`
+    <div class="page-title">الموظفون</div>
+    <div class="toolbar">
+      ${can('hr.manage') ? '<button class="btn" id="addEmp">+ إضافة موظف</button>' : ''}
+      <a class="btn ghost" href="#hr">← الموظفون</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>الموظف</th><th>الوظيفة</th><th>الراتب الأساسي</th><th>الحالة</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" class="empty">لا يوجد موظفون بعد</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'more');
+  if(can('hr.manage')){
+    $('#addEmp').onclick = () => empForm(null);
+    document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => empForm((data||[]).find(e=>e.id===b.dataset.edit)));
+  }
+}
+
+function empForm(e){
+  $('#modal').innerHTML = `
+  <div class="modal-bg"><div class="modal">
+    <h3>${e ? 'تعديل موظف' : 'إضافة موظف'}</h3><div id="mmsg"></div>
+    <div class="field"><label>الاسم</label><input id="em_name" value="${esc(e?.name||'')}"></div>
+    <div class="field"><label>الهاتف</label><input id="em_phone" dir="ltr" value="${esc(e?.phone||'')}"></div>
+    <div class="field"><label>البريد</label><input id="em_email" dir="ltr" value="${esc(e?.email||'')}"></div>
+    <div class="field"><label>الوظيفة</label><input id="em_job" value="${esc(e?.job_title||'')}"></div>
+    <div class="field"><label>القسم</label><input id="em_dept" value="${esc(e?.department||'')}"></div>
+    <div class="field"><label>تاريخ التعيين</label><input id="em_hire" type="date" value="${e?.hire_date||new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>الراتب الأساسي</label><input id="em_sal" type="number" min="0" step="0.01" dir="ltr" value="${e?.base_salary||0}"></div>
+    ${e ? `<div class="field"><label>الحالة</label><select id="em_active"><option value="1" ${e.is_active?'selected':''}>نشط</option><option value="0" ${!e.is_active?'selected':''}>منتهي</option></select></div>` : ''}
+    <button class="btn" id="saveEmp">حفظ</button>
+    <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button>
+  </div></div>`;
+  $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  $('#saveEmp').onclick = async () => {
+    const body = { name: $('#em_name').value.trim(), phone: $('#em_phone').value.trim(), email: $('#em_email').value.trim(),
+      job_title: $('#em_job').value.trim(), department: $('#em_dept').value.trim(), hire_date: $('#em_hire').value,
+      base_salary: Number($('#em_sal').value) || 0 };
+    let error;
+    if(e){ ({ error } = await sb.from('employees').update({...body, is_active: $('#em_active').value==='1'}).eq('id', e.id)); }
+    else { ({ error } = await sb.from('employees').insert({...body, created_by: session.user.id})); }
+    if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    $('#modal').innerHTML = ''; employeesView();
+  };
+}
+
+async function attendanceView(){
+  if(!can('hr.view') && !can('hr.manage')) return shell(`<div class="page-title">الحضور</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">الحضور والانصراف</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const today = new Date().toISOString().slice(0,10);
+  const [{ data: emps }, { data: att }] = await Promise.all([
+    sb.from('employees').select('*').eq('is_active', true).is('deleted_at', null),
+    sb.from('attendance').select('*').eq('date', today),
+  ]);
+  const byEmp = Object.fromEntries((att||[]).map(a=>[a.employee_id, a]));
+  const ATT_ST = { present:'حاضر', absent:'غائب', leave:'إجازة', late:'متأخر' };
+  shell(`
+    <div class="page-title">حضور اليوم — ${new Date().toLocaleDateString('ar-EG')}</div>
+    <div class="toolbar"><a class="btn ghost" href="#hr">← الموظفون</a></div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>الموظف</th><th>الحالة</th><th>حضور</th><th>انصراف</th>${can('hr.manage')?'<th></th>':''}</tr></thead>
+      <tbody>${(emps||[]).map(e => { const a = byEmp[e.id]; return `
+        <tr><td><b>${esc(e.name)}</b></td>
+        <td>${a ? `<span class="badge ${a.status==='present'?'green':a.status==='absent'?'red':'navy'}">${ATT_ST[a.status]}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+        <td>${a?.check_in ? new Date(a.check_in).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+        <td>${a?.check_out ? new Date(a.check_out).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+        ${can('hr.manage') ? `<td class="row-actions">
+          <button data-in="${e.id}">تسجيل حضور</button>
+          ${a && !a.check_out ? `<button data-out="${a.id}">انصراف</button>` : ''}
+          <button data-absent="${e.id}">غائب</button></td>` : ''}</tr>`; }).join('') || '<tr><td colspan="5" class="empty">أضف موظفين أولاً</td></tr>'}</tbody>
+    </table></div>`, 'more');
+  if(can('hr.manage')){
+    document.querySelectorAll('[data-in]').forEach(b => b.onclick = async () => {
+      const { error } = await sb.from('attendance').upsert({ employee_id: b.dataset.in, date: today, check_in: new Date().toISOString(), status: 'present', created_by: session.user.id }, { onConflict: 'employee_id,date' });
+      if(error) $('#msg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; else attendanceView();
+    });
+    document.querySelectorAll('[data-out]').forEach(b => b.onclick = async () => {
+      await sb.from('attendance').update({ check_out: new Date().toISOString() }).eq('id', b.dataset.out); attendanceView();
+    });
+    document.querySelectorAll('[data-absent]').forEach(b => b.onclick = async () => {
+      await sb.from('attendance').upsert({ employee_id: b.dataset.absent, date: today, status: 'absent', created_by: session.user.id }, { onConflict: 'employee_id,date' }); attendanceView();
+    });
+  }
+}
+
+async function leavesView(){
+  if(!can('hr.view') && !can('hr.manage')) return shell(`<div class="page-title">الإجازات</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">الإجازات</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const [{ data: lv }, { data: emps }] = await Promise.all([
+    sb.from('leaves').select('*, employees(name)').is('deleted_at', null).order('created_at', {ascending:false}).limit(50),
+    sb.from('employees').select('*').eq('is_active', true).is('deleted_at', null),
+  ]);
+  const st = s => s==='approved' ? '<span class="badge green">مقبولة</span>' : s==='rejected' ? '<span class="badge red">مرفوضة</span>' : '<span class="badge navy">قيد الانتظار</span>';
+  shell(`
+    <div class="page-title">الإجازات</div>
+    <div class="toolbar">
+      ${can('hr.manage') ? '<button class="btn" id="addL">+ طلب إجازة</button>' : ''}
+      <a class="btn ghost" href="#hr">← الموظفون</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>الموظف</th><th>النوع</th><th>من</th><th>إلى</th><th>الحالة</th><th></th></tr></thead>
+      <tbody>${(lv||[]).map(l => `<tr><td><b>${esc(l.employees?.name||'')}</b></td><td>${esc(l.kind)}</td>
+        <td>${new Date(l.from_date).toLocaleDateString('ar-EG')}</td><td>${new Date(l.to_date).toLocaleDateString('ar-EG')}</td><td>${st(l.status)}</td>
+        <td class="row-actions">${l.status==='pending' && can('hr.manage') ? `<button data-ok="${l.id}">قبول</button><button data-no="${l.id}">رفض</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد طلبات</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'more');
+  if(can('hr.manage')){
+    $('#addL').onclick = () => {
+      $('#modal').innerHTML = `
+      <div class="modal-bg"><div class="modal"><h3>طلب إجازة</h3><div id="mmsg"></div>
+        <div class="field"><label>الموظف</label><select id="l_emp">${(emps||[]).map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>النوع</label><select id="l_kind"><option value="annual">سنوية</option><option value="sick">مرضية</option><option value="unpaid">بدون أجر</option><option value="emergency">طارئة</option></select></div>
+        <div class="field"><label>من</label><input id="l_from" type="date"></div>
+        <div class="field"><label>إلى</label><input id="l_to" type="date"></div>
+        <button class="btn" id="saveL">حفظ</button>
+        <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
+      $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+      $('#saveL').onclick = async () => {
+        const { error } = await sb.from('leaves').insert({ employee_id: $('#l_emp').value, kind: $('#l_kind').value, from_date: $('#l_from').value, to_date: $('#l_to').value, created_by: session.user.id });
+        if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+        $('#modal').innerHTML = ''; leavesView();
+      };
+    };
+    document.querySelectorAll('[data-ok]').forEach(b => b.onclick = async () => { await sb.from('leaves').update({ status:'approved', approved_by: session.user.id }).eq('id', b.dataset.ok); leavesView(); });
+    document.querySelectorAll('[data-no]').forEach(b => b.onclick = async () => { await sb.from('leaves').update({ status:'rejected', approved_by: session.user.id }).eq('id', b.dataset.no); leavesView(); });
+  }
+}
+
+async function advancesView(){
+  if(!can('hr.view') && !can('hr.manage') && !can('advances.manage')) return shell(`<div class="page-title">السلف</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">السلف والقروض</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const [{ data: advs }, { data: emps }, { data: boxes }] = await Promise.all([
+    sb.from('v_advance_book').select('*').order('request_date', {ascending:false}),
+    sb.from('employees').select('*').eq('is_active', true).is('deleted_at', null),
+    sb.from('cashboxes').select('*').eq('is_active', true).is('deleted_at', null),
+  ]);
+  const ST = { pending:['قيد الانتظار','navy'], approved:['معتمدة','navy'], rejected:['مرفوضة','red'], disbursed:['مصروفة','green'], settled:['مسددة','green'] };
+  shell(`
+    <div class="page-title">السلف والقروض</div>
+    <div class="toolbar">
+      ${can('advances.manage') || can('hr.manage') ? '<button class="btn" id="addA">+ طلب سلفة</button>' : ''}
+      <a class="btn ghost" href="#hr">← الموظفون</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>المرجع</th><th>الموظف</th><th>المبلغ</th><th>المتبقي</th><th>الأقساط</th><th>الحالة</th><th></th></tr></thead>
+      <tbody>${(advs||[]).map(a => { const s = ST[a.status]||[a.status,'navy']; return `
+        <tr><td dir="ltr" style="text-align:right">${esc(a.ref_no)}</td><td><b>${esc(a.employee_name)}</b><br><span style="font-size:.75rem;color:var(--muted)">${esc(a.reason||'')}</span></td>
+        <td>${money(a.amount)}</td><td>${money(a.remaining)}</td>
+        <td>${a.total_installments ? a.paid_installments + '/' + a.total_installments : '—'}</td>
+        <td><span class="badge ${s[1]}">${s[0]}</span></td>
+        <td class="row-actions">
+          ${a.status==='pending' && can('advances.approve') ? `<button data-approve="${a.id}">اعتماد</button><button data-reject="${a.id}">رفض</button>` : ''}
+          ${a.status==='approved' && (can('advances.manage')||can('advances.approve')) ? `<button data-disburse="${a.id}">صرف</button>` : ''}
+          ${a.status==='disbursed' ? `<button data-insts="${a.id}">الأقساط</button>` : ''}
+        </td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">لا توجد سلف بعد</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'more');
+  const canReq = can('advances.manage') || can('hr.manage');
+  if(canReq) $('#addA').onclick = () => {
+    $('#modal').innerHTML = `
+    <div class="modal-bg"><div class="modal"><h3>طلب سلفة</h3><div id="mmsg"></div>
+      <div class="field"><label>الموظف</label><select id="a_emp">${(emps||[]).map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>المبلغ</label><input id="a_amount" type="number" min="0" step="0.01" dir="ltr"></div>
+      <div class="field"><label>السبب</label><input id="a_reason"></div>
+      <div class="field"><label>قسط السداد الشهري</label><input id="a_inst" type="number" min="0" step="0.01" dir="ltr"></div>
+      <div class="field"><label>طريقة السداد</label><select id="a_method"><option value="salary_deduction">خصم من الراتب</option><option value="cash">نقدي</option></select></div>
+      <button class="btn" id="saveA">إرسال الطلب</button>
+      <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    $('#saveA').onclick = async () => {
+      const { error } = await sb.from('advances').insert({ employee_id: $('#a_emp').value, amount: Number($('#a_amount').value)||0,
+        reason: $('#a_reason').value.trim(), installment_amount: Number($('#a_inst').value)||0,
+        repayment_method: $('#a_method').value, created_by: session.user.id });
+      if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+      $('#modal').innerHTML = ''; advancesView();
+    };
+  };
+  document.querySelectorAll('[data-approve]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('advances').update({ status:'approved' }).eq('id', b.dataset.approve);
+    if(error) $('#msg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; else advancesView();
+  });
+  document.querySelectorAll('[data-reject]').forEach(b => b.onclick = async () => {
+    await sb.from('advances').update({ status:'rejected' }).eq('id', b.dataset.reject); advancesView();
+  });
+  document.querySelectorAll('[data-disburse]').forEach(b => b.onclick = () => {
+    $('#modal').innerHTML = `
+    <div class="modal-bg"><div class="modal"><h3>صرف السلفة</h3><div id="mmsg"></div>
+      <div class="field"><label>خزينة الصرف</label><select id="d_box">${(boxes||[]).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div>
+      <p style="font-size:.8rem;color:var(--muted)">قيد تلقائي: سلف الموظفين (مدين) / الخزينة (دائن)، ويُنشأ جدول الأقساط.</p>
+      <button class="btn" id="doD">تأكيد الصرف</button>
+      <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    $('#doD').onclick = async () => {
+      const { error } = await sb.from('advances').update({ status:'disbursed', cashbox_id: $('#d_box').value }).eq('id', b.dataset.disburse);
+      if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+      $('#modal').innerHTML = ''; advancesView();
+    };
+  });
+  document.querySelectorAll('[data-insts]').forEach(b => b.onclick = async () => {
+    const { data: insts } = await sb.from('advance_installments').select('*').eq('advance_id', b.dataset.insts).order('due_date');
+    $('#modal').innerHTML = `
+    <div class="modal-bg"><div class="modal"><h3>جدول الأقساط</h3>
+      <div class="tablewrap"><table><thead><tr><th>الاستحقاق</th><th>القسط</th><th>السداد</th><th></th></tr></thead>
+      <tbody>${(insts||[]).map(i=>`<tr><td>${new Date(i.due_date).toLocaleDateString('ar-EG')}</td><td>${money(i.amount)}</td>
+        <td>${i.paid_date ? new Date(i.paid_date).toLocaleDateString('ar-EG') : '—'}</td>
+        <td>${!i.paid_date && (can('advances.manage')||can('hr.manage')) ? `<button data-pay="${i.id}">تسجيل سداد</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
+      <button class="btn ghost" id="closeModal" style="margin-top:.6rem">إغلاق</button></div></div>`;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    document.querySelectorAll('[data-pay]').forEach(p => p.onclick = async () => {
+      await sb.from('advance_installments').update({ paid_date: new Date().toISOString().slice(0,10) }).eq('id', p.dataset.pay);
+      $('#modal').innerHTML = ''; advancesView();
+    });
+  });
+}
+
 async function callFn(action, payload = {}){
   const res = await fetch(`${SUPA_URL}/functions/v1/admin-users`, {
     method: 'POST',
@@ -598,7 +933,15 @@ async function render(){
     if(sub === 'vouchers') return vouchersView();
     if(sub === 'journals') return journalsView();
     if(sub === 'trial') return trialView();
+    if(sub === 'expenses') return expensesView();
     return finHome();
+  }
+  if(root === 'hr'){
+    if(sub === 'employees') return employeesView();
+    if(sub === 'attendance') return attendanceView();
+    if(sub === 'leaves') return leavesView();
+    if(sub === 'advances') return advancesView();
+    return hrHome();
   }
   return dashView();
 }
