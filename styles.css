@@ -84,3 +84,5 @@ a.link-card{text-decoration:none; color:inherit; display:block}
 .jline{display:grid; grid-template-columns:1fr 80px 80px; gap:.4rem; margin-bottom:.4rem}
 .jline input{padding:.55rem .6rem; border:1px solid var(--line); border-radius:10px; background:var(--bg); color:var(--text); font-size:.85rem}
 tfoot td{border-top:2px solid var(--line); padding:.6rem .5rem}
+.iline{grid-template-columns:1fr 70px 90px}
+@media print{ .topbar,.bottomnav,.toolbar,#msg{display:none!important} body{background:#fff} .card{border:1px solid #ddd} }

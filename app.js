@@ -276,12 +276,13 @@ function moreView(){
   shell(`
     <div class="page-title">المزيد</div>
     <div class="cards">
-      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٥ — العملاء والموردون</div></div>
+      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٦ — المبيعات والمشتريات والتوريد</div></div>
       <div class="card"><div class="k">العملة الأساسية</div><div class="v" style="font-size:1rem">جنيه مصري (EGP)</div></div>
     </div>
     <div class="card" style="margin-top:1rem"><div class="k">الأقسام</div>
       <p style="margin-top:.4rem;font-size:.9rem"><a href="#hr" style="color:var(--emerald-d)">🧑‍💼 الموظفون والموارد البشرية والسلف ←</a></p>
       <p style="margin-top:.4rem;font-size:.9rem"><a href="#parties" style="color:var(--emerald-d)">🤝 العملاء والموردون وكشوف الحساب ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#trade" style="color:var(--emerald-d)">🧾 التوريد والمبيعات والمشتريات ←</a></p>
       <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">قريباً: العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
     </div>`, 'more');
 }
@@ -1026,6 +1027,225 @@ async function statementView(ptype, pid){
     </table></div>`, 'more');
 }
 
+/* ---------- TRADE (phase 6) ---------- */
+const INV_STATUS = { new:'جديد', under_review:'قيد المراجعة', approved:'معتمد', in_progress:'قيد التنفيذ', shipped:'تم الشحن', delivered:'تم التسليم', completed:'مكتمل', cancelled:'ملغي' };
+const INV_NEXT = { new:'under_review', under_review:'approved', approved:'in_progress', in_progress:'shipped', shipped:'delivered', delivered:'completed' };
+
+function tradeHome(){
+  if(!can('sales.manage') && !can('purchases.manage'))
+    return shell(`<div class="page-title">المبيعات والمشتريات</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  const items = [
+    ['trade/sales','فواتير المبيعات','🧾','sales.manage','فواتير وأوامر بيع بهامش ربح'],
+    ['trade/purchases','فواتير المشتريات','🛒','purchases.manage','فواتير وأوامر شراء'],
+    ['trade/quotes','عروض الأسعار','📄','sales.manage','عروض أسعار للعملاء'],
+    ['trade/supply','طلبات التوريد','📦','sales.manage','متابعة طلبات التوريد وحالاتها'],
+  ].filter(([, , , p]) => can(p));
+  shell(`
+    <div class="page-title">التوريد والمبيعات والمشتريات</div>
+    <div class="cards">
+      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+    </div>`, 'more');
+}
+
+async function invoicesView(kind){
+  const perm = (kind === 'purchase' || kind === 'purchase_return') ? 'purchases.manage' : 'sales.manage';
+  if(!can(perm)) return shell(`<div class="page-title">الفواتير</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  const titles = { sale:'فواتير المبيعات', purchase:'فواتير المشتريات', quote:'عروض الأسعار' };
+  const ptype = kind === 'purchase' ? 'supplier' : 'customer';
+  shell(`<div class="page-title">${titles[kind]}</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const [{ data: invs }, { data: parties }] = await Promise.all([
+    sb.from('invoices').select('*').eq('kind', kind).is('deleted_at', null).order('created_at', {ascending:false}).limit(100),
+    sb.from(kind === 'purchase' ? 'suppliers' : 'customers').select('id,name').is('deleted_at', null),
+  ]);
+  const byId = Object.fromEntries((parties||[]).map(p=>[p.id, p.name]));
+  const stBadge = s => `<span class="badge ${s==='completed'||s==='approved'?'green':s==='cancelled'?'red':'navy'}">${INV_STATUS[s]||s}</span>`;
+  const rows = (invs||[]).map(i => `
+    <tr><td dir="ltr" style="text-align:right"><a href="#trade/invoice/${i.id}" style="color:var(--emerald-d)">${esc(i.ref_no)}</a></td>
+    <td>${new Date(i.date).toLocaleDateString('ar-EG')}</td>
+    <td><b>${esc(byId[i.party_id]||'—')}</b></td>
+    <td><b>${fmt(i.total)} ${esc(i.currency)}</b></td>
+    <td>${fmt(i.paid||0)}</td>
+    <td>${stBadge(i.status)}</td></tr>`).join('');
+  shell(`
+    <div class="page-title">${titles[kind]}</div>
+    <div class="toolbar">
+      <button class="btn" id="addI">+ ${titles[kind].replace('فواتير ','').replace('عروض ','عرض ')} جديد</button>
+      <a class="btn ghost" href="#trade">← التوريد</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>المرجع</th><th>التاريخ</th><th>${kind==='purchase'?'المورد':'العميل'}</th><th>الإجمالي</th><th>المدفوع</th><th>الحالة</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" class="empty">لا توجد مستندات بعد</td></tr>'}</tbody>
+    </table></div>`, 'more');
+  $('#addI').onclick = () => invoiceForm(kind, ptype, parties||[]);
+}
+
+function invoiceForm(kind, ptype, parties){
+  if(!parties.length){ $('#msg').innerHTML = `<div class="msg err">أضف ${kind==='purchase'?'مورداً':'عميلاً'} أولاً من قسم العملاء والموردين.</div>`; return; }
+  const lineRow = () => `<div class="jline iline">
+    <input class="il_desc" placeholder="الصنف / البيان" style="grid-column: span 1">
+    <input class="il_qty" type="number" min="0" step="0.01" placeholder="الكمية" dir="ltr">
+    <input class="il_price" type="number" min="0" step="0.01" placeholder="السعر" dir="ltr">
+  </div>`;
+  $('#msg').insertAdjacentHTML('afterend', `
+  <div class="modal-bg" id="invModal"><div class="modal">
+    <h3>${kind==='quote'?'عرض سعر':kind==='sale'?'فاتورة بيع':'فاتورة شراء'} جديد</h3><div id="mmsg"></div>
+    <div class="field"><label>${kind==='purchase'?'المورد':'العميل'}</label><select id="i_party">${parties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>التاريخ</label><input id="i_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>العملة</label><select id="i_curr"><option>EGP</option><option>USD</option><option>EUR</option><option>SAR</option></select></div>
+    <div class="field"><label>سعر الصرف</label><input id="i_fx" type="number" min="0" step="0.0001" value="1" dir="ltr"></div>
+    <label>البنود</label>
+    <div id="ilines">${lineRow()}${lineRow()}</div>
+    <button class="btn ghost" id="moreIL" style="margin:.4rem 0">+ بند</button>
+    <div class="field"><label>خصم على الإجمالي</label><input id="i_disc" type="number" min="0" step="0.01" value="0" dir="ltr"></div>
+    <div class="field"><label>مصاريف شحن/نقل</label><input id="i_ship" type="number" min="0" step="0.01" value="0" dir="ltr"></div>
+    <div class="field"><label>ملاحظات</label><input id="i_notes"></div>
+    <button class="btn" id="saveI">حفظ</button>
+    <button class="btn ghost" id="closeIM" style="margin-top:.4rem">إلغاء</button>
+  </div></div>`);
+  $('#closeIM').onclick = () => $('#invModal').remove();
+  $('#moreIL').onclick = () => $('#ilines').insertAdjacentHTML('beforeend', lineRow());
+  $('#i_curr').onchange = async () => {
+    const code = $('#i_curr').value;
+    if(code==='EGP'){ $('#i_fx').value = 1; return; }
+    const { data } = await sb.from('fx_rates').select('*').eq('currency', code).order('date', {ascending:false}).limit(1);
+    if(data && data.length) $('#i_fx').value = data[0].rate;
+  };
+  $('#saveI').onclick = async () => {
+    const { data: inv, error } = await sb.from('invoices').insert({
+      kind, party_type: ptype, party_id: $('#i_party').value, date: $('#i_date').value,
+      currency: $('#i_curr').value, fx_rate: Number($('#i_fx').value) || 1,
+      discount: Number($('#i_disc').value) || 0, shipping_cost: Number($('#i_ship').value) || 0,
+      notes: $('#i_notes').value.trim(), status: 'new', created_by: session.user.id }).select().single();
+    if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    const lines = [...document.querySelectorAll('.iline')].map(el => ({
+      invoice_id: inv.id, description: el.querySelector('.il_desc').value.trim(),
+      qty: Number(el.querySelector('.il_qty').value) || 0, unit_price: Number(el.querySelector('.il_price').value) || 0 }))
+      .filter(l => l.qty > 0);
+    if(lines.length){ const { error: e2 } = await sb.from('invoice_lines').insert(lines);
+      if(e2){ $('#mmsg').innerHTML = `<div class="msg err">${esc(e2.message)}</div>`; return; } }
+    $('#invModal').remove(); invoicesView(kind);
+  };
+}
+
+async function invoiceDetail(id){
+  shell(`<div class="page-title">فاتورة</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const [{ data: inv }, { data: lines }, { data: pays }, { data: margin }] = await Promise.all([
+    sb.from('invoices').select('*').eq('id', id).single(),
+    sb.from('invoice_lines').select('*').eq('invoice_id', id),
+    sb.from('payments').select('*, cashboxes(name)').eq('invoice_id', id).is('deleted_at', null),
+    sb.from('v_sales_margin').select('*').eq('invoice_id', id).maybeSingle(),
+  ]);
+  if(!inv) return shell(`<div class="page-title">فاتورة</div><div class="empty">غير موجودة.</div>`, 'more');
+  const { data: party } = await sb.from(inv.party_type === 'supplier' ? 'suppliers' : 'customers').select('name,phone,address,tax_number').eq('id', inv.party_id).single();
+  const perm = inv.party_type === 'supplier' ? 'purchases.manage' : 'sales.manage';
+  const next = INV_NEXT[inv.status];
+  const remain = Number(inv.total) - Number(inv.paid||0);
+  const kindTitle = { sale:'فاتورة بيع', purchase:'فاتورة شراء', quote:'عرض سعر', sale_return:'مرتجع بيع', purchase_return:'مرتجع شراء' }[inv.kind];
+  shell(`
+    <div class="page-title">${kindTitle} <span dir="ltr">${esc(inv.ref_no)}</span></div>
+    <div style="color:var(--muted);font-size:.85rem;margin-bottom:.8rem">${esc(party?.name||'')} · ${new Date(inv.date).toLocaleDateString('ar-EG')} · <span class="badge ${inv.status==='cancelled'?'red':'navy'}">${INV_STATUS[inv.status]}</span></div>
+    <div class="toolbar">
+      ${next && can(perm) ? `<button class="btn" id="nextSt">→ ${INV_STATUS[next]}</button>` : ''}
+      ${inv.status!=='cancelled' && inv.status!=='completed' && can(perm) ? '<button class="btn ghost" id="cancelI">إلغاء المستند</button>' : ''}
+      ${(inv.kind==='sale'||inv.kind==='purchase') && remain > 0 && can('treasury.manage') ? '<button class="btn" id="payI">تسجيل دفعة</button>' : ''}
+      <button class="btn ghost" onclick="window.print()">🖨️ طباعة / PDF</button>
+      <a class="btn ghost" href="#trade/${inv.kind==='quote'?'quotes':inv.kind==='sale'?'sales':'purchases'}">← رجوع</a>
+    </div>
+    <div id="msg"></div>
+    <div class="card">
+      <div class="tablewrap"><table>
+        <thead><tr><th>البيان</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
+        <tbody>${(lines||[]).map(l=>`<tr><td>${esc(l.description||'')}</td><td>${fmt(l.qty)}</td><td>${fmt(l.unit_price)}</td><td>${fmt(l.total)}</td></tr>`).join('')}</tbody>
+      </table></div>
+      <div style="margin-top:.6rem;font-size:.9rem">
+        الإجمالي الفرعي: <b>${fmt(inv.subtotal)}</b> · ضريبة: ${fmt(inv.tax)} · خصم: ${fmt(inv.discount)} · شحن: ${fmt(inv.shipping_cost)}
+        <br>الإجمالي: <b style="color:var(--emerald-d)">${fmt(inv.total)} ${esc(inv.currency)}</b> · المدفوع: ${fmt(inv.paid||0)} · المتبقي: <b>${fmt(remain)}</b>
+        ${margin && margin.cost > 0 ? `<br>هامش الربح: <b class="em">${money(margin.margin)}</b>` : ''}
+      </div>
+    </div>
+    ${(pays||[]).length ? `<div class="card" style="margin-top:1rem"><div class="k">الدفعات</div>
+      <div class="tablewrap" style="margin-top:.5rem"><table><thead><tr><th>المرجع</th><th>التاريخ</th><th>المبلغ</th><th>الخزينة</th></tr></thead>
+      <tbody>${pays.map(p=>`<tr><td dir="ltr" style="text-align:right">${esc(p.ref_no)}</td><td>${new Date(p.date).toLocaleDateString('ar-EG')}</td><td>${fmt(p.amount)}</td><td>${esc(p.cashboxes?.name||'')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+    <div id="modal"></div>`, 'more');
+  if(next && can(perm)) $('#nextSt').onclick = async () => {
+    const { error } = await sb.from('invoices').update({ status: next }).eq('id', id);
+    if(error) $('#msg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; else invoiceDetail(id);
+  };
+  const cBtn = $('#cancelI'); if(cBtn) cBtn.onclick = async () => {
+    await sb.from('invoices').update({ status: 'cancelled' }).eq('id', id); invoiceDetail(id);
+  };
+  const pBtn = $('#payI'); if(pBtn) pBtn.onclick = async () => {
+    const { data: boxes } = await sb.from('cashboxes').select('*').eq('is_active', true).is('deleted_at', null);
+    if(!boxes || !boxes.length){ $('#msg').innerHTML = `<div class="msg err">أضف خزينة أولاً.</div>`; return; }
+    $('#modal').innerHTML = `
+    <div class="modal-bg"><div class="modal"><h3>تسجيل دفعة — المتبقي ${fmt(remain)}</h3><div id="mmsg"></div>
+      <div class="field"><label>المبلغ (${esc(inv.currency)})</label><input id="p_amount" type="number" min="0" step="0.01" dir="ltr" value="${remain}"></div>
+      <div class="field"><label>الخزينة</label><select id="p_box">${boxes.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
+      <button class="btn" id="doPay">حفظ الدفعة</button>
+      <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    $('#doPay').onclick = async () => {
+      const { error } = await sb.from('payments').insert({
+        kind: inv.kind==='sale' ? 'receipt' : 'payment', amount: Number($('#p_amount').value)||0,
+        currency: inv.currency, fx_rate: inv.fx_rate, cashbox_id: $('#p_box').value,
+        party_type: inv.party_type, party_id: inv.party_id, invoice_id: inv.id,
+        notes: 'دفعة ' + inv.ref_no, created_by: session.user.id });
+      if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+      $('#modal').innerHTML = ''; invoiceDetail(id);
+    };
+  };
+}
+
+async function supplyView(){
+  if(!can('sales.manage') && !can('purchases.manage')) return shell(`<div class="page-title">التوريد</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">طلبات التوريد</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const [{ data: srs }, { data: custs }, { data: sups }] = await Promise.all([
+    sb.from('supply_requests').select('*').is('deleted_at', null).order('created_at', {ascending:false}).limit(100),
+    sb.from('customers').select('id,name').is('deleted_at', null),
+    sb.from('suppliers').select('id,name').is('deleted_at', null),
+  ]);
+  const names = { customer: Object.fromEntries((custs||[]).map(p=>[p.id,p.name])), supplier: Object.fromEntries((sups||[]).map(p=>[p.id,p.name])) };
+  shell(`
+    <div class="page-title">طلبات التوريد</div>
+    <div class="toolbar"><button class="btn" id="addS">+ طلب توريد</button><a class="btn ghost" href="#trade">← التوريد</a></div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>المرجع</th><th>العنوان</th><th>الطرف</th><th>التسليم المتوقع</th><th>الحالة</th><th></th></tr></thead>
+      <tbody>${(srs||[]).map(s => `<tr><td dir="ltr" style="text-align:right">${esc(s.ref_no)}</td><td><b>${esc(s.title)}</b></td>
+        <td>${esc((names[s.party_type]||{})[s.party_id]||'—')}</td>
+        <td>${s.expected_date ? new Date(s.expected_date).toLocaleDateString('ar-EG') : '—'}</td>
+        <td><span class="badge navy">${INV_STATUS[s.status]||s.status}</span></td>
+        <td class="row-actions">${INV_NEXT[s.status] ? `<button data-next="${s.id}" data-to="${INV_NEXT[s.status]}">→ ${INV_STATUS[INV_NEXT[s.status]]}</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد طلبات توريد</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'more');
+  $('#addS').onclick = () => {
+    $('#modal').innerHTML = `
+    <div class="modal-bg"><div class="modal"><h3>طلب توريد جديد</h3><div id="mmsg"></div>
+      <div class="field"><label>العنوان</label><input id="s_title"></div>
+      <div class="field"><label>الطرف</label><select id="s_ptype"><option value="customer">عميل</option><option value="supplier">مورد</option></select></div>
+      <div class="field"><label>الاسم</label><select id="s_pid"></select></div>
+      <div class="field"><label>تاريخ التسليم المتوقع</label><input id="s_date" type="date"></div>
+      <div class="field"><label>ملاحظات</label><input id="s_notes"></div>
+      <button class="btn" id="saveS">حفظ</button>
+      <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
+    const fillPid = () => { const t = $('#s_ptype').value; $('#s_pid').innerHTML = (t==='customer'?custs||[]:sups||[]).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join(''); };
+    fillPid(); $('#s_ptype').onchange = fillPid;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    $('#saveS').onclick = async () => {
+      const { error } = await sb.from('supply_requests').insert({ title: $('#s_title').value.trim(), party_type: $('#s_ptype').value,
+        party_id: $('#s_pid').value || null, expected_date: $('#s_date').value || null, notes: $('#s_notes').value.trim(), created_by: session.user.id });
+      if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+      $('#modal').innerHTML = ''; supplyView();
+    };
+  };
+  document.querySelectorAll('[data-next]').forEach(b => b.onclick = async () => {
+    const upd = { status: b.dataset.to };
+    if(b.dataset.to === 'approved'){ upd.approved_by = session.user.id; upd.approved_at = new Date().toISOString(); }
+    await sb.from('supply_requests').update(upd).eq('id', b.dataset.next); supplyView();
+  });
+}
+
 async function callFn(action, payload = {}){
   const res = await fetch(`${SUPA_URL}/functions/v1/admin-users`, {
     method: 'POST',
@@ -1067,6 +1287,15 @@ async function render(){
     if(sub === 'customers' || sub === 'suppliers') return partyView(sub);
     if(sub === 'statement') return statementView(parts[2], parts[3]);
     return partiesHome();
+  }
+  if(root === 'trade'){
+    const parts = h.split('/');
+    if(sub === 'sales') return invoicesView('sale');
+    if(sub === 'purchases') return invoicesView('purchase');
+    if(sub === 'quotes') return invoicesView('quote');
+    if(sub === 'supply') return supplyView();
+    if(sub === 'invoice') return invoiceDetail(parts[2]);
+    return tradeHome();
   }
   return dashView();
 }
