@@ -178,22 +178,24 @@ async function dashView(){
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'صباح الخير' : 'مساء الخير';
   const dateStr = new Date().toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
-  const card = (k, v, cls='') => `<div class="card"><div class="k">${k}</div><div class="v ${cls}">${v === null ? '—' : v}</div></div>`;
+  const stat = (ic, k, v, cls='') => `<div class="stat"><div class="si">${ic}</div><div><div class="sk">${k}</div><div class="sv ${cls}">${v === null ? '—' : v}</div></div></div>`;
   shell(`
-    <div class="page-title">${greet}، ${esc(profile.full_name.split(' ')[0])}</div>
-    <div style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">${dateStr}</div>
-    <div class="cards">
-      ${card('مبيعات اليوم', fmt(t.sales_today) + ' ج.م', 'em')}
-      ${card('مشتريات اليوم', fmt(t.purchases_today) + ' ج.م')}
-      ${card('مقبوضات اليوم', fmt(c.receipts_today) + ' ج.م', 'em')}
-      ${card('مدفوعات اليوم', fmt(c.payments_today) + ' ج.م')}
-      ${card('إجمالي أرصدة الخزائن', fmt(totalCash) + ' ج.م', 'em')}
-      ${card('مستحقات العملاء', fmt(recv) + ' ج.م')}
-      ${card('مستحقات الموردين', fmt(payb) + ' ج.م')}
-      ${card('قيمة المخزون', fmt(iv.stock_value) + ' ج.م')}
+    <div class="dash-hero">
+      <div class="greet">${greet}، ${esc(profile.full_name.split(' ')[0])}</div>
+      <div class="date">${dateStr}</div>
+    </div>
+    <div class="stats">
+      ${stat(I.trendup, 'مبيعات اليوم', fmt(t.sales_today) + ' ج.م', 'em')}
+      ${stat(I.cart, 'مشتريات اليوم', fmt(t.purchases_today) + ' ج.م')}
+      ${stat(I.inbox, 'مقبوضات اليوم', fmt(c.receipts_today) + ' ج.م', 'em')}
+      ${stat(I.outbox, 'مدفوعات اليوم', fmt(c.payments_today) + ' ج.م')}
+      ${stat(I.wallet, 'إجمالي أرصدة الخزائن', fmt(totalCash) + ' ج.م', 'em')}
+      ${stat(I.users, 'مستحقات العملاء', fmt(recv) + ' ج.م')}
+      ${stat(I.factory, 'مستحقات الموردين', fmt(payb) + ' ج.م')}
+      ${stat(I.box, 'قيمة المخزون', fmt(iv.stock_value) + ' ج.م')}
     </div>
     ${lowItems.length ? `
-    <div class="card" style="margin-top:1rem;border-color:#f59e0b">
+    <div class="card" style="margin-top:.7rem;border-color:#f59e0b">
       <div class="k">${I.alert} أصناف تحت حد الطلب (${lowItems.length})</div>
       <div class="tablewrap" style="margin-top:.5rem"><table>
         <thead><tr><th>الصنف</th><th>المخزن</th><th>المتاح</th><th>الحد</th></tr></thead>
@@ -201,7 +203,7 @@ async function dashView(){
       </table></div>
     </div>` : ''}
     ${(boxes.data||[]).length ? `
-    <div class="card" style="margin-top:1rem">
+    <div class="card" style="margin-top:.7rem">
       <div class="k">الخزائن والبنوك</div>
       <div class="tablewrap" style="margin-top:.5rem"><table>
         <thead><tr><th>الخزينة</th><th>النوع</th><th>الرصيد</th></tr></thead>
@@ -209,7 +211,7 @@ async function dashView(){
       </table></div>
     </div>` : ''}
     ${(activity.data||[]).length ? `
-    <div class="card" style="margin-top:1rem">
+    <div class="card" style="margin-top:.7rem">
       <div class="k">آخر الأنشطة</div>
       <div style="margin-top:.5rem">${(activity.data||[]).map(r=>`
         <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.85rem">

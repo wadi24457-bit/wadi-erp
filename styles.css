@@ -94,3 +94,16 @@ svg.ico{width:1.25em;height:1.25em;vertical-align:-.25em;flex:none}
 .big-ic svg.ico{width:30px;height:30px}
 td svg.ico,button svg.ico{width:1.1em;height:1.1em;vertical-align:-.2em}
 .page-title svg.ico{width:.95em;height:.95em}
+
+/* Dashboard: compact professional stat grid */
+.dash-hero{margin-bottom:.9rem}
+.dash-hero .greet{font-size:1.2rem;font-weight:800}
+.dash-hero .date{color:var(--muted);font-size:.78rem;margin-top:.15rem}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:.6rem .7rem;display:flex;align-items:center;gap:.6rem}
+.stat .si{width:32px;height:32px;border-radius:9px;background:var(--bg);color:var(--emerald-d);display:flex;align-items:center;justify-content:center;flex:none}
+.stat .si svg.ico{width:17px;height:17px;stroke-width:2.2}
+.stat .sk{font-size:.7rem;color:var(--muted);font-weight:600;line-height:1.35}
+.stat .sv{font-size:1rem;font-weight:800;margin-top:.1rem}
+.stat .sv.em{color:var(--emerald-d)}
+@media(min-width:640px){.stats{grid-template-columns:repeat(4,1fr)}}
