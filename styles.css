@@ -79,3 +79,8 @@ tr:nth-child(even) td{background:rgba(100,116,139,.05)}
 .spin{display:inline-block; width:22px; height:22px; border:3px solid var(--line); border-top-color:var(--emerald); border-radius:50%; animation:sp 1s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .center{display:flex; justify-content:center; padding:3rem}
+a.link-card{text-decoration:none; color:inherit; display:block}
+.neg{color:#ef4444}
+.jline{display:grid; grid-template-columns:1fr 80px 80px; gap:.4rem; margin-bottom:.4rem}
+.jline input{padding:.55rem .6rem; border:1px solid var(--line); border-radius:10px; background:var(--bg); color:var(--text); font-size:.85rem}
+tfoot td{border-top:2px solid var(--line); padding:.6rem .5rem}

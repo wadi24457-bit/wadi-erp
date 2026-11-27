@@ -22,7 +22,7 @@ const PERMS = {
   'parties.manage':'إدارة العملاء والموردين','sales.manage':'المبيعات','purchases.manage':'المشتريات',
   'inventory.view':'عرض المخزون','inventory.manage':'إدارة المخازن','trade.view':'عرض الاستيراد والتصدير',
   'trade.manage':'إدارة الاستيراد والتصدير','reports.view':'التقارير','users.manage':'إدارة المستخدمين',
-  'settings.manage':'الإعدادات','audit.view':'سجل الأنشطة'
+  'treasury.overdraw':'الصرف فوق رصيد الخزينة','settings.manage':'الإعدادات','audit.view':'سجل الأنشطة'
 };
 
 let session = null, profile = null, roleDefaults = {};
@@ -89,7 +89,7 @@ function loginView(){
 }
 
 const NAV = [
-  ['dash','الرئيسية','🏠'],['users','المستخدمون','👥'],['audit','السجل','📋'],['more','المزيد','⚙️']
+  ['dash','الرئيسية','🏠'],['fin','المالية','💰'],['users','المستخدمون','👥'],['audit','السجل','📋'],['more','المزيد','⚙️']
 ];
 function shell(content, active){
   const dark = localStorage.getItem('wadi-theme') === 'dark';
@@ -276,12 +276,300 @@ function moreView(){
   shell(`
     <div class="page-title">المزيد</div>
     <div class="cards">
-      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٢ — لوحة التحكم</div></div>
+      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٣ — الحسابات والخزائن</div></div>
       <div class="card"><div class="k">العملة الأساسية</div><div class="v" style="font-size:1rem">جنيه مصري (EGP)</div></div>
     </div>
     <div class="card" style="margin-top:1rem"><div class="k">قريباً</div>
-      <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">الحسابات والخزائن (المرحلة التالية) · المصروفات والسلف والموظفون · العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
+      <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">المصروفات والسلف والموظفون (المرحلة التالية) · العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
     </div>`, 'more');
+}
+
+/* ---------- FINANCE (phase 3) ---------- */
+const ACCT_TYPES = { asset:'أصول', liability:'خصوم', equity:'حقوق ملكية', revenue:'إيرادات', expense:'مصروفات' };
+const PARTY_TYPES = { customer:'عميل', supplier:'مورد', employee:'موظف', other:'أخرى' };
+const money = n => fmt(n) + ' ج.م';
+
+function finHome(){
+  if(!can('accounting.view') && !can('treasury.manage'))
+    return shell(`<div class="page-title">المالية</div><div class="empty">لا تملك صلاحية الوصول إلى المالية.</div>`, 'fin');
+  const items = [
+    ['fin/vouchers','سندات القبض والصرف','🧾','treasury.manage','تسجيل المقبوضات والمدفوعات مع قيد محاسبي تلقائي'],
+    ['fin/cashboxes','الخزائن والبنوك','🏦','treasury.manage','إدارة الخزائن ومتابعة أرصدتها'],
+    ['fin/journals','القيود اليومية','📒','accounting.view','قيود مزدوجة مع اعتماد ومنع تعديل بعد الاعتماد'],
+    ['fin/accounts','دليل الحسابات','🗂️','accounting.view','شجرة الحسابات والأرصدة'],
+    ['fin/trial','ميزان المراجعة','⚖️','accounting.view','أرصدة كل الحسابات من القيود المعتمدة'],
+  ].filter(([, , , p]) => can(p));
+  shell(`
+    <div class="page-title">الحسابات والخزائن</div>
+    <div class="cards">
+      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+    </div>`, 'fin');
+}
+
+async function accountsView(){
+  if(!can('accounting.view')) return shell(`<div class="page-title">دليل الحسابات</div><div class="empty">لا تملك الصلاحية.</div>`, 'fin');
+  shell(`<div class="page-title">دليل الحسابات</div><div class="center"><span class="spin"></span></div>`, 'fin');
+  const { data } = await sb.from('v_trial_balance').select('*').order('code');
+  const rows = (data||[]).map(a => `
+    <tr>
+      <td dir="ltr" style="text-align:right"><b>${esc(a.code)}</b></td>
+      <td>${a.parent_id ? '&nbsp;&nbsp;└ ' : ''}<b>${esc(a.name)}</b></td>
+      <td><span class="badge navy">${ACCT_TYPES[a.type]||a.type}</span></td>
+      <td class="${a.balance >= 0 ? '' : 'neg'}">${money(a.balance)}</td>
+    </tr>`).join('');
+  shell(`
+    <div class="page-title">دليل الحسابات</div>
+    <div class="toolbar">
+      ${can('accounting.manage') ? '<button class="btn" id="addAcct">+ إضافة حساب</button>' : ''}
+      <a class="btn ghost" href="#fin">← المالية</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>الكود</th><th>الحساب</th><th>النوع</th><th>الرصيد</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" class="empty">لا توجد حسابات</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'fin');
+  if(can('accounting.manage')) $('#addAcct').onclick = () => acctForm(data||[]);
+}
+
+function acctForm(all){
+  $('#modal').innerHTML = `
+  <div class="modal-bg"><div class="modal">
+    <h3>إضافة حساب</h3><div id="mmsg"></div>
+    <div class="field"><label>الكود</label><input id="a_code" dir="ltr" placeholder="مثال: 1110"></div>
+    <div class="field"><label>اسم الحساب</label><input id="a_name"></div>
+    <div class="field"><label>النوع</label><select id="a_type">${Object.entries(ACCT_TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+    <div class="field"><label>الحساب الأب (اختياري)</label><select id="a_parent"><option value="">— بدون —</option>
+      ${all.map(a=>`<option value="${a.id}">${esc(a.code)} — ${esc(a.name)}</option>`).join('')}</select></div>
+    <button class="btn" id="saveAcct">حفظ</button>
+    <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button>
+  </div></div>`;
+  $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  $('#saveAcct').onclick = async () => {
+    const { error } = await sb.from('accounts').insert({
+      code: $('#a_code').value.trim(), name: $('#a_name').value.trim(),
+      type: $('#a_type').value, parent_id: $('#a_parent').value || null, created_by: session.user.id });
+    if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    $('#modal').innerHTML = ''; accountsView();
+  };
+}
+
+async function cashboxesView(){
+  if(!can('treasury.manage') && !can('accounting.view')) return shell(`<div class="page-title">الخزائن</div><div class="empty">لا تملك الصلاحية.</div>`, 'fin');
+  shell(`<div class="page-title">الخزائن والبنوك</div><div class="center"><span class="spin"></span></div>`, 'fin');
+  const { data } = await sb.from('v_cashbox_balances').select('*').order('name');
+  const total = (data||[]).reduce((s,b)=>s+Number(b.balance||0),0);
+  shell(`
+    <div class="page-title">الخزائن والبنوك</div>
+    <div class="toolbar">
+      ${can('treasury.manage') ? '<button class="btn" id="addCb">+ إضافة خزينة</button>' : ''}
+      <a class="btn ghost" href="#fin">← المالية</a>
+    </div>
+    <div id="msg"></div>
+    <div class="cards">${(data||[]).map(b=>`
+      <div class="card"><div class="k">${esc(b.name)} <span class="badge navy">${b.kind==='bank'?'بنك':'نقدية'}</span></div><div class="v em">${money(b.balance)}</div></div>`).join('')}
+      <div class="card"><div class="k">الإجمالي</div><div class="v">${money(total)}</div></div>
+    </div>
+    ${!(data||[]).length ? '<div class="empty">لا توجد خزائن بعد — أضف أول خزينة لتبدأ تسجيل السندات.</div>' : ''}
+    <div id="modal"></div>`, 'fin');
+  if(can('treasury.manage')) $('#addCb').onclick = () => {
+    $('#modal').innerHTML = `
+    <div class="modal-bg"><div class="modal">
+      <h3>إضافة خزينة</h3><div id="mmsg"></div>
+      <div class="field"><label>الاسم</label><input id="c_name" placeholder="مثال: الخزينة الرئيسية"></div>
+      <div class="field"><label>النوع</label><select id="c_kind"><option value="cash">نقدية</option><option value="bank">حساب بنكي</option></select></div>
+      <p style="font-size:.8rem;color:var(--muted)">سيُنشأ حساب مقابل لها تلقائياً في دليل الحسابات.</p>
+      <button class="btn" id="saveCb">حفظ</button>
+      <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button>
+    </div></div>`;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    $('#saveCb').onclick = async () => {
+      const { error } = await sb.from('cashboxes').insert({ name: $('#c_name').value.trim(), kind: $('#c_kind').value, created_by: session.user.id });
+      if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+      $('#modal').innerHTML = ''; cashboxesView();
+    };
+  };
+}
+
+async function vouchersView(){
+  if(!can('treasury.manage')) return shell(`<div class="page-title">السندات</div><div class="empty">لا تملك صلاحية الخزائن.</div>`, 'fin');
+  shell(`<div class="page-title">سندات القبض والصرف</div><div class="center"><span class="spin"></span></div>`, 'fin');
+  const [{ data: pays }, { data: boxes }, { data: currs }] = await Promise.all([
+    sb.from('payments').select('*, cashboxes(name)').is('deleted_at', null).order('created_at', {ascending:false}).limit(100),
+    sb.from('cashboxes').select('*').eq('is_active', true).is('deleted_at', null),
+    sb.from('currencies').select('*'),
+  ]);
+  const rows = (pays||[]).map(p => `
+    <tr>
+      <td><span class="badge ${p.kind==='receipt'?'green':'red'}">${p.kind==='receipt'?'قبض':'صرف'}</span></td>
+      <td dir="ltr" style="text-align:right">${esc(p.ref_no)}</td>
+      <td>${new Date(p.date).toLocaleDateString('ar-EG')}</td>
+      <td><b>${fmt(p.amount)} ${esc(p.currency)}</b>${p.fx_rate !== 1 ? `<br><span style="font-size:.72rem;color:var(--muted)">صرف ${fmt(p.fx_rate)}</span>` : ''}</td>
+      <td>${esc(p.cashboxes?.name||'')}</td>
+      <td>${PARTY_TYPES[p.party_type]||'—'}</td>
+      <td style="font-size:.78rem;color:var(--muted)">${esc(p.notes||'')}</td>
+    </tr>`).join('');
+  shell(`
+    <div class="page-title">سندات القبض والصرف</div>
+    <div class="toolbar">
+      <button class="btn" id="addV">+ سند جديد</button>
+      <a class="btn ghost" href="#fin">← المالية</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>النوع</th><th>المرجع</th><th>التاريخ</th><th>المبلغ</th><th>الخزينة</th><th>الطرف</th><th>بيان</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="empty">لا توجد سندات بعد</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'fin');
+  $('#addV').onclick = () => voucherForm(boxes||[], currs||[]);
+}
+
+function voucherForm(boxes, currs){
+  if(!boxes.length){ $('#msg').innerHTML = `<div class="msg err">أضف خزينة أولاً من صفحة الخزائن.</div>`; return; }
+  $('#modal').innerHTML = `
+  <div class="modal-bg"><div class="modal">
+    <h3>سند جديد</h3><div id="mmsg"></div>
+    <div class="field"><label>النوع</label><select id="v_kind"><option value="receipt">سند قبض (مقبوضات)</option><option value="payment">سند صرف (مدفوعات)</option></select></div>
+    <div class="field"><label>التاريخ</label><input id="v_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>المبلغ</label><input id="v_amount" type="number" min="0" step="0.01" dir="ltr"></div>
+    <div class="field"><label>العملة</label><select id="v_curr">${(currs.length?currs:[{code:'EGP'}]).map(c=>`<option value="${c.code}" ${c.code==='EGP'?'selected':''}>${c.code}${c.name?' — '+esc(c.name):''}</option>`).join('')}</select></div>
+    <div class="field"><label>سعر الصرف (إلى الجنيه)</label><input id="v_fx" type="number" min="0" step="0.0001" value="1" dir="ltr"></div>
+    <div class="field"><label>الخزينة</label><select id="v_box">${boxes.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>الطرف</label><select id="v_ptype">${Object.entries(PARTY_TYPES).map(([k,v])=>`<option value="${k}" ${k==='other'?'selected':''}>${v}</option>`).join('')}</select></div>
+    <div class="field"><label>البيان (اسم الطرف والسبب)</label><input id="v_notes" placeholder="مثال: تحصيل من شركة النور عن فاتورة 12"></div>
+    <p style="font-size:.8rem;color:var(--muted)">يُنشأ قيد يومية معتمد تلقائياً: ${'{'}مدين/دائن{'}'} حسب نوع السند، ولا يمكن صرف مبلغ أكبر من رصيد الخزينة إلا بصلاحية خاصة.</p>
+    <button class="btn" id="saveV">حفظ السند</button>
+    <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button>
+  </div></div>`;
+  $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  $('#v_curr').onchange = async () => {
+    const code = $('#v_curr').value;
+    if(code === 'EGP'){ $('#v_fx').value = 1; return; }
+    const { data } = await sb.from('fx_rates').select('*').eq('currency', code).order('date', {ascending:false}).limit(1);
+    if(data && data.length) $('#v_fx').value = data[0].rate;
+  };
+  $('#saveV').onclick = async () => {
+    const amount = Number($('#v_amount').value);
+    if(!amount || amount <= 0){ $('#mmsg').innerHTML = `<div class="msg err">أدخل مبلغاً صحيحاً.</div>`; return; }
+    const { error } = await sb.from('payments').insert({
+      kind: $('#v_kind').value, date: $('#v_date').value, amount,
+      currency: $('#v_curr').value, fx_rate: Number($('#v_fx').value) || 1,
+      cashbox_id: $('#v_box').value, party_type: $('#v_ptype').value,
+      notes: $('#v_notes').value.trim(), created_by: session.user.id });
+    if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    $('#modal').innerHTML = ''; vouchersView();
+  };
+}
+
+async function journalsView(){
+  if(!can('accounting.view')) return shell(`<div class="page-title">القيود</div><div class="empty">لا تملك الصلاحية.</div>`, 'fin');
+  shell(`<div class="page-title">القيود اليومية</div><div class="center"><span class="spin"></span></div>`, 'fin');
+  const { data: js } = await sb.from('journals').select('*').is('deleted_at', null).order('created_at', {ascending:false}).limit(100);
+  const st = s => s==='approved' ? '<span class="badge green">معتمد</span>' : s==='voided' ? '<span class="badge red">ملغي</span>' : '<span class="badge navy">مسودة</span>';
+  const rows = (js||[]).map(j => `
+    <tr>
+      <td dir="ltr" style="text-align:right">${esc(j.ref_no)}</td>
+      <td>${new Date(j.date).toLocaleDateString('ar-EG')}</td>
+      <td>${esc(j.description)}</td>
+      <td>${st(j.status)}</td>
+      <td class="row-actions">
+        <button data-view="${j.id}">عرض</button>
+        ${j.status==='draft' && can('accounting.approve') ? `<button data-approve="${j.id}">اعتماد</button>` : ''}
+        ${j.status==='draft' && can('accounting.manage') ? `<button data-del="${j.id}">حذف</button>` : ''}
+      </td>
+    </tr>`).join('');
+  shell(`
+    <div class="page-title">القيود اليومية</div>
+    <div class="toolbar">
+      ${can('accounting.manage') ? '<button class="btn" id="addJ">+ قيد يدوي</button>' : ''}
+      <a class="btn ghost" href="#fin">← المالية</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>المرجع</th><th>التاريخ</th><th>البيان</th><th>الحالة</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" class="empty">لا توجد قيود بعد</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'fin');
+  document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => journalDetail(b.dataset.view));
+  document.querySelectorAll('[data-approve]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('journals').update({ status:'approved' }).eq('id', b.dataset.approve);
+    if(error) $('#msg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`;
+    journalsView();
+  });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if(!confirm('حذف هذه المسودة؟')) return;
+    await sb.from('journals').update({ deleted_at: new Date().toISOString() }).eq('id', b.dataset.del);
+    journalsView();
+  });
+  if(can('accounting.manage')) $('#addJ').onclick = () => journalForm();
+}
+
+async function journalDetail(id){
+  const { data: j } = await sb.from('journals').select('*').eq('id', id).single();
+  const { data: lines } = await sb.from('journal_lines').select('*, accounts(code,name)').eq('journal_id', id);
+  const td = (lines||[]).reduce((s,l)=>s+Number(l.debit),0), tc = (lines||[]).reduce((s,l)=>s+Number(l.credit),0);
+  $('#modal').innerHTML = `
+  <div class="modal-bg"><div class="modal">
+    <h3 dir="ltr" style="text-align:right">${esc(j.ref_no)}</h3>
+    <p style="font-size:.85rem;color:var(--muted)">${new Date(j.date).toLocaleDateString('ar-EG')} · ${esc(j.description)}</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>الحساب</th><th>مدين</th><th>دائن</th></tr></thead>
+      <tbody>${(lines||[]).map(l=>`<tr><td><span dir="ltr">${esc(l.accounts?.code||'')}</span> ${esc(l.accounts?.name||'')}</td><td>${l.debit?fmt(l.debit):''}</td><td>${l.credit?fmt(l.credit):''}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td><b>الإجمالي</b></td><td><b>${fmt(td)}</b></td><td><b>${fmt(tc)}</b></td></tr></tfoot>
+    </table></div>
+    <button class="btn ghost" id="closeModal" style="margin-top:.6rem">إغلاق</button>
+  </div></div>`;
+  $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+}
+
+async function journalForm(){
+  const { data: accts } = await sb.from('accounts').select('*').eq('is_active', true).is('deleted_at', null).order('code');
+  const lineRow = () => `<div class="jline">
+    <select class="jl_acct">${(accts||[]).map(a=>`<option value="${a.id}">${esc(a.code)} — ${esc(a.name)}</option>`).join('')}</select>
+    <input class="jl_dr" type="number" min="0" step="0.01" placeholder="مدين" dir="ltr">
+    <input class="jl_cr" type="number" min="0" step="0.01" placeholder="دائن" dir="ltr">
+  </div>`;
+  $('#modal').innerHTML = `
+  <div class="modal-bg"><div class="modal">
+    <h3>قيد يومية يدوي</h3><div id="mmsg"></div>
+    <div class="field"><label>التاريخ</label><input id="j_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>البيان</label><input id="j_desc"></div>
+    <label>السطور (مدين = دائن لاعتماد القيد)</label>
+    <div id="jlines">${lineRow()}${lineRow()}</div>
+    <button class="btn ghost" id="moreLine" style="margin:.4rem 0">+ سطر</button>
+    <button class="btn" id="saveJ">حفظ كمسودة</button>
+    <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button>
+  </div></div>`;
+  $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  $('#moreLine').onclick = () => $('#jlines').insertAdjacentHTML('beforeend', lineRow());
+  $('#saveJ').onclick = async () => {
+    const { data: j, error } = await sb.from('journals').insert({
+      date: $('#j_date').value, description: $('#j_desc').value.trim(), status: 'draft', created_by: session.user.id }).select().single();
+    if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    const lines = [...document.querySelectorAll('.jline')].map(el => ({
+      journal_id: j.id, account_id: el.querySelector('.jl_acct').value,
+      debit: Number(el.querySelector('.jl_dr').value) || 0, credit: Number(el.querySelector('.jl_cr').value) || 0 }))
+      .filter(l => l.debit > 0 || l.credit > 0);
+    if(lines.length){ const { error: e2 } = await sb.from('journal_lines').insert(lines);
+      if(e2){ $('#mmsg').innerHTML = `<div class="msg err">${esc(e2.message)}</div>`; return; } }
+    $('#modal').innerHTML = ''; journalsView();
+  };
+}
+
+async function trialView(){
+  if(!can('accounting.view')) return shell(`<div class="page-title">ميزان المراجعة</div><div class="empty">لا تملك الصلاحية.</div>`, 'fin');
+  shell(`<div class="page-title">ميزان المراجعة</div><div class="center"><span class="spin"></span></div>`, 'fin');
+  const { data } = await sb.from('v_trial_balance').select('*').order('code');
+  const active = (data||[]).filter(a => a.total_debit || a.total_credit);
+  const td = active.reduce((s,a)=>s+Number(a.total_debit),0), tc = active.reduce((s,a)=>s+Number(a.total_credit),0);
+  shell(`
+    <div class="page-title">ميزان المراجعة</div>
+    <div class="toolbar"><a class="btn ghost" href="#fin">← المالية</a></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>الكود</th><th>الحساب</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
+      <tbody>${active.map(a=>`<tr><td dir="ltr" style="text-align:right">${esc(a.code)}</td><td>${esc(a.name)}</td><td>${fmt(a.total_debit)}</td><td>${fmt(a.total_credit)}</td><td class="${a.balance>=0?'':'neg'}">${money(a.balance)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">لا توجد حركات معتمدة بعد</td></tr>'}</tbody>
+      ${active.length ? `<tfoot><tr><td colspan="2"><b>الإجمالي</b></td><td><b>${fmt(td)}</b></td><td><b>${fmt(tc)}</b></td><td class="${Math.abs(td-tc)<0.005?'em':'neg'}"><b>${Math.abs(td-tc)<0.005?'متوازن ✓':'غير متوازن!'}</b></td></tr></tfoot>` : ''}
+    </table></div>`, 'fin');
 }
 
 async function callFn(action, payload = {}){
@@ -300,9 +588,18 @@ async function render(){
   if(!profile){ await loadProfile(); }
   if(!profile){ loginView(); return; }
   const h = (location.hash || '#dash').slice(1);
-  if(h === 'users') return usersView();
-  if(h === 'audit') return auditView();
-  if(h === 'more') return moreView();
+  const [root, sub] = h.split('/');
+  if(root === 'users') return usersView();
+  if(root === 'audit') return auditView();
+  if(root === 'more') return moreView();
+  if(root === 'fin'){
+    if(sub === 'accounts') return accountsView();
+    if(sub === 'cashboxes') return cashboxesView();
+    if(sub === 'vouchers') return vouchersView();
+    if(sub === 'journals') return journalsView();
+    if(sub === 'trial') return trialView();
+    return finHome();
+  }
   return dashView();
 }
 window.addEventListener('hashchange', render);
