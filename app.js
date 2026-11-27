@@ -2221,8 +2221,10 @@ async function render(){
   return dashView();
 }
 window.addEventListener('hashchange', render);
+const SW_VER = 'v17';
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').then(r=>r.update()).catch(()=>{});
+  // versioned URL + updateViaCache:'none': old clients always fetch a fresh sw.js
+  navigator.serviceWorker.register('sw.js?'+SW_VER, {updateViaCache:'none'}).then(r=>{ r.update(); setInterval(()=>r.update(), 30*60*1000); }).catch(()=>{});
   let swReloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!swReloaded){ swReloaded = true; location.reload(); } });
 }
