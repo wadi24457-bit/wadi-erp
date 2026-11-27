@@ -39,12 +39,12 @@ begin
     when 'customer' then (select id from public.accounts where code='1200')
     when 'supplier' then (select id from public.accounts where code='2100')
     when 'employee' then (select id from public.accounts where code='1400')
-    else (select id from public.accounts where code='5200') end;
+    else (select id from public.accounts where code = case when new.kind='receipt' then '4200' else '5200' end) end;
   insert into public.journals (date, description, status, source_type, source_id, created_by)
     values (new.date,
       (case when new.kind='receipt' then 'سند قبض ' else 'سند صرف ' end) || new.ref_no
         || coalesce(' — ' || new.notes, ''),
-      'approved', 'payment', new.id, new.created_by)
+      'draft', 'payment', new.id, new.created_by)
     returning id into j;
   if new.kind = 'receipt' then
     insert into public.journal_lines (journal_id, account_id, debit, credit, currency, fx_rate, party_type, party_id, description)
@@ -55,6 +55,7 @@ begin
       values (j, counter, new.amount, 0, new.currency, new.fx_rate, new.party_type, new.party_id, new.notes),
              (j, cb.account_id, 0, new.amount, new.currency, new.fx_rate, new.party_type, new.party_id, new.notes);
   end if;
+  update public.journals set status = 'approved' where id = j;
   new.journal_id := j;
   return new;
 end $$;
