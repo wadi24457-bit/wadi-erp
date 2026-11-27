@@ -592,7 +592,8 @@ async function expensesView(){
     <tr><td dir="ltr" style="text-align:right">${esc(e.ref_no)}</td><td>${new Date(e.date).toLocaleDateString('ar-EG')}</td>
     <td>${esc(e.category)}</td><td><b>${fmt(e.amount)} ${esc(e.currency)}</b></td>
     <td>${esc(e.cashboxes?.name||'—')}</td><td>${esc(e.responsible||'')}</td>
-    <td style="font-size:.78rem;color:var(--muted)">${esc(e.notes||'')}</td></tr>`).join('');
+    <td style="font-size:.78rem;color:var(--muted)">${esc(e.notes||'')}</td>
+    <td class="row-actions"><button data-att="${e.id}" title="المرفقات">📎</button></td></tr>`).join('');
   const cmpRows = (cmp||[]).map(b => {
     const pct = b.budget > 0 ? Math.round(b.actual / b.budget * 100) : 0;
     return `<tr><td>${esc(b.category)}</td><td>${money(b.budget)}</td><td>${money(b.actual)}</td>
@@ -608,10 +609,22 @@ async function expensesView(){
     ${cmpRows ? `<div class="card" style="margin-bottom:1rem"><div class="k">ميزانية هذا الشهر مقابل الفعلي</div>
       <div class="tablewrap" style="margin-top:.5rem"><table><thead><tr><th>التصنيف</th><th>الميزانية</th><th>الفعلي</th><th>النسبة</th></tr></thead><tbody>${cmpRows}</tbody></table></div></div>` : ''}
     <div class="tablewrap"><table>
-      <thead><tr><th>المرجع</th><th>التاريخ</th><th>التصنيف</th><th>المبلغ</th><th>مصدر الدفع</th><th>المسؤول</th><th>ملاحظات</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" class="empty">لا توجد مصروفات بعد</td></tr>'}</tbody>
+      <thead><tr><th>المرجع</th><th>التاريخ</th><th>التصنيف</th><th>المبلغ</th><th>مصدر الدفع</th><th>المسؤول</th><th>ملاحظات</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="8" class="empty">لا توجد مصروفات بعد</td></tr>'}</tbody>
     </table></div>
     <div id="modal"></div>`, 'fin');
+  document.querySelectorAll('[data-att]').forEach(b => b.onclick = async () => {
+    const eid = b.dataset.att;
+    const refresh = async () => {
+      $('#attachCard').outerHTML = await attachCard('expense', eid);
+      bindAttach('expense', eid, refresh);
+    };
+    $('#modal').innerHTML = `<div class="modal-bg"><div class="modal"><h3>مرفقات المصروف</h3>
+      ${await attachCard('expense', eid)}
+      <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إغلاق</button></div></div>`;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    bindAttach('expense', eid, refresh);
+  });
   if(can('expenses.manage')){
     $('#addE').onclick = () => expenseForm(boxes||[]);
     $('#setB').onclick = () => budgetForm(month);
@@ -629,12 +642,13 @@ function expenseForm(boxes){
     <div class="field"><label>مصدر الدفع (الخزينة) — إلزامي</label><select id="e_box">${boxes.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
     <div class="field"><label>طريقة الدفع</label><select id="e_method"><option>نقدي</option><option>تحويل بنكي</option><option>شيك</option><option>بطاقة</option></select></div>
     <div class="field"><label>المسؤول</label><input id="e_resp" value="${esc(profile.full_name)}"></div>
-    <div class="field"><label>ملاحظات</label><input id="e_notes"></div>
+    <div class="field"><label>ملاحظات ${voiceMicBtn('e_notes')}</label><input id="e_notes"></div>
     <p style="font-size:.8rem;color:var(--muted)">يُنشأ قيد تلقائي: حساب المصروف مدين والخزينة دائن، مع منع الصرف فوق الرصيد.</p>
     <button class="btn" id="saveE">حفظ</button>
     <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button>
   </div></div>`;
   $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  bindVoiceMic('e_notes');
   $('#saveE').onclick = async () => {
     const amount = Number($('#e_amount').value);
     if(!amount || amount <= 0){ $('#mmsg').innerHTML = `<div class="msg err">أدخل مبلغاً صحيحاً.</div>`; return; }
@@ -1168,7 +1182,9 @@ async function invoiceDetail(id){
     ${(pays||[]).length ? `<div class="card" style="margin-top:1rem"><div class="k">الدفعات</div>
       <div class="tablewrap" style="margin-top:.5rem"><table><thead><tr><th>المرجع</th><th>التاريخ</th><th>المبلغ</th><th>الخزينة</th></tr></thead>
       <tbody>${pays.map(p=>`<tr><td dir="ltr" style="text-align:right">${esc(p.ref_no)}</td><td>${new Date(p.date).toLocaleDateString('ar-EG')}</td><td>${fmt(p.amount)}</td><td>${esc(p.cashboxes?.name||'')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+    ${await attachCard('invoice', id)}
     <div id="modal"></div>`, 'more');
+  bindAttach('invoice', id, () => invoiceDetail(id));
   if(next && can(perm)) $('#nextSt').onclick = async () => {
     const { error } = await sb.from('invoices').update({ status: next }).eq('id', id);
     if(error) $('#msg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; else invoiceDetail(id);
@@ -1338,7 +1354,7 @@ function prodForm(p){
   <div class="modal-bg"><div class="modal"><h3>${p?'تعديل صنف':'صنف جديد'}</h3><div id="mmsg"></div>
     <div class="field"><label>الاسم</label><input id="pr_name" value="${esc(p?.name||'')}"></div>
     <div class="field"><label>SKU</label><input id="pr_sku" dir="ltr" value="${esc(p?.sku||'')}" placeholder="يُنشأ تلقائياً إذا تُرك فارغاً"></div>
-    <div class="field"><label>الباركود</label><input id="pr_bar" dir="ltr" value="${esc(p?.barcode||'')}"></div>
+    <div class="field"><label>الباركود ${scanBarcodeBtn('pr_bar')}</label><input id="pr_bar" dir="ltr" value="${esc(p?.barcode||'')}"></div>
     <div class="field"><label>الفئة</label><input id="pr_cat" value="${esc(p?.category||'')}"></div>
     <div class="field"><label>وحدة القياس</label><input id="pr_unit" value="${esc(p?.unit||'قطعة')}"></div>
     <div class="field"><label>الحد الأدنى (تنبيه)</label><input id="pr_min" type="number" min="0" step="0.01" dir="ltr" value="${p?.min_stock||0}"></div>
@@ -1347,6 +1363,7 @@ function prodForm(p){
     <button class="btn" id="savePr">حفظ</button>
     <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
   $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  bindBarcodeScan('pr_bar');
   $('#savePr').onclick = async () => {
     const body = { name: $('#pr_name').value.trim(), barcode: $('#pr_bar').value.trim() || null,
       category: $('#pr_cat').value.trim() || null, unit: $('#pr_unit').value.trim() || 'قطعة',
@@ -1476,6 +1493,117 @@ async function callFn(action, payload = {}){
   return data;
 }
 
+/* ---------- ATTACHMENTS / SCAN / VOICE (user-requested mobile features) ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const hasCameraScan = !!(navigator.mediaDevices?.getUserMedia && window.BarcodeDetector);
+
+async function attachCard(ownerType, ownerId){
+  const { data: atts } = await sb.from('attachments').select('*')
+    .eq('owner_type', ownerType).eq('owner_id', ownerId).is('deleted_at', null).order('created_at', {ascending:false});
+  return `
+    <div class="card" id="attachCard">
+      <div class="k">المرفقات (${(atts||[]).length})</div>
+      <div id="attList" style="margin:.4rem 0">${(atts||[]).map(a => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:.82rem">${a.file_url.endsWith('.pdf')?'📄':'🖼️'} ${esc(a.label||'مرفق')}</span>
+          <span><button class="btn ghost" data-view="${esc(a.id)}" style="padding:.2rem .6rem;font-size:.78rem">عرض</button>
+          <button class="btn ghost" data-del="${esc(a.id)}" style="padding:.2rem .6rem;font-size:.78rem">حذف</button></span>
+        </div>`).join('') || '<div style="font-size:.8rem;color:var(--muted)">لا توجد مرفقات — صوّر الفاتورة أو أرفق ملفاً.</div>'}</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        <button class="btn" id="attCam">📷 تصوير</button>
+        <button class="btn ghost" id="attFile">📎 إرفاق ملف</button>
+      </div>
+      <input type="file" id="attCamIn" accept="image/*" capture="environment" style="display:none">
+      <input type="file" id="attFileIn" accept="image/*,application/pdf" style="display:none">
+      <div id="attMsg"></div>
+    </div>`;
+}
+
+function bindAttach(ownerType, ownerId, onChange){
+  const atts = () => sb.from('attachments').select('*').eq('owner_type', ownerType).eq('owner_id', ownerId).is('deleted_at', null);
+  $('#attCam').onclick = () => $('#attCamIn').click();
+  $('#attFile').onclick = () => $('#attFileIn').click();
+  const upload = async (file) => {
+    if(!file) return;
+    if(file.size > 10*1024*1024){ $('#attMsg').innerHTML = '<div class="msg err">الملف أكبر من 10 ميجا</div>'; return; }
+    $('#attMsg').innerHTML = '<div class="center"><span class="spin"></span></div>';
+    const safe = file.name.replace(/[^\w.\-\u0600-\u06FF]/g, '_').slice(-60);
+    const path = `${ownerType}/${ownerId}/${Date.now()}_${safe}`;
+    const { error: upErr } = await sb.storage.from('docs').upload(path, file, { contentType: file.type || 'application/octet-stream' });
+    if(upErr){ $('#attMsg').innerHTML = `<div class="msg err">${esc(upErr.message)}</div>`; return; }
+    const { error: dbErr } = await sb.from('attachments').insert({ owner_type: ownerType, owner_id: ownerId, label: file.name, file_url: path, created_by: session.user.id });
+    if(dbErr){ $('#attMsg').innerHTML = `<div class="msg err">${esc(dbErr.message)}</div>`; return; }
+    onChange();
+  };
+  $('#attCamIn').onchange = e => upload(e.target.files[0]);
+  $('#attFileIn').onchange = e => upload(e.target.files[0]);
+  document.querySelectorAll('[data-view]').forEach(b => b.onclick = async () => {
+    const { data } = await atts().eq('id', b.dataset.view).single();
+    const { data: signed, error } = await sb.storage.from('docs').createSignedUrl(data.file_url, 3600);
+    if(error || !signed?.signedUrl){ $('#attMsg').innerHTML = `<div class="msg err">تعذر فتح المرفق</div>`; return; }
+    window.open(signed.signedUrl, '_blank');
+  });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if(!confirm('حذف المرفق؟')) return;
+    const { data } = await atts().eq('id', b.dataset.del).single();
+    await sb.from('attachments').update({ deleted_at: new Date().toISOString() }).eq('id', b.dataset.del);
+    if(data) await sb.storage.from('docs').remove([data.file_url]);
+    onChange();
+  });
+}
+
+const voiceMicBtn = (fieldId) => SR ? `<button type="button" class="btn ghost" id="mic_${fieldId}" style="padding:.2rem .6rem;font-size:.85rem" title="إدخال صوتي">🎤</button>` : '';
+function bindVoiceMic(fieldId){
+  const btn = $(`#mic_${fieldId}`);
+  if(!btn || !SR) return;
+  btn.onclick = () => {
+    const rec = new SR();
+    rec.lang = 'ar-EG'; rec.interimResults = false;
+    btn.textContent = '🔴…'; btn.disabled = true;
+    rec.onresult = (ev) => {
+      const text = Array.from(ev.results).map(r => r[0].transcript).join(' ');
+      const f = $(`#${fieldId}`);
+      f.value = (f.value ? f.value + ' ' : '') + text;
+    };
+    rec.onend = () => { btn.textContent = '🎤'; btn.disabled = false; };
+    rec.onerror = () => { btn.textContent = '🎤'; btn.disabled = false; };
+    rec.start();
+  };
+}
+
+const scanBarcodeBtn = (fieldId) => hasCameraScan ? `<button type="button" class="btn ghost" id="scan_${fieldId}" style="padding:.2rem .6rem;font-size:.85rem" title="مسح الباركود بالكاميرا">📷 مسح</button>` : '';
+function bindBarcodeScan(fieldId){
+  const btn = $(`#scan_${fieldId}`);
+  if(!btn || !hasCameraScan) return;
+  btn.onclick = async () => {
+    $('#modal').innerHTML = `
+      <div class="modal-bg"><div class="modal"><h3>مسح الباركود</h3>
+      <video id="scanVid" autoplay playsinline style="width:100%;border-radius:12px;background:#000"></video>
+      <div id="scanMsg" style="font-size:.82rem;color:var(--muted);margin:.3rem 0">وجّه الكاميرا نحو الباركود…</div>
+      <button class="btn ghost" id="scanClose">إلغاء</button></div></div>`;
+    let stream;
+    const stop = () => { if(stream) stream.getTracks().forEach(t=>t.stop()); $('#modal').innerHTML = ''; };
+    $('#scanClose').onclick = stop;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const vid = $('#scanVid');
+      vid.srcObject = stream;
+      const det = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code'] });
+      const tick = async () => {
+        if(!document.body.contains(vid)) return;
+        try {
+          const codes = await det.detect(vid);
+          if(codes.length){ $(`#${fieldId}`).value = codes[0].rawValue; stop(); return; }
+        } catch(e){}
+        requestAnimationFrame(tick);
+      };
+      tick();
+    } catch(e){
+      $('#scanMsg').textContent = 'تعذر فتح الكاميرا — أدخل الباركود يدوياً.';
+    }
+  };
+}
+
 /* ---------- IMPORT / EXPORT (phase 8) ---------- */
 const SHIP_STATUS = { new:'جديدة', in_transit:'قيد الشحن', customs:'في الجمارك', arrived:'وصلت', cleared:'تم التخليص', completed:'مكتملة', cancelled:'ملغاة' };
 const SHIP_FLOW = ['new','in_transit','customs','arrived','cleared'];
@@ -1557,10 +1685,11 @@ async function shipForm(s){
       <div class="field"><label>مصاريف الموانئ</label><input id="sh_port" type="number" min="0" step="0.01" dir="ltr" value="${s?.port_fees||0}"></div>
       <div class="field"><label>تكلفة الشحن</label><input id="sh_freight" type="number" min="0" step="0.01" dir="ltr" value="${s?.freight_cost||0}"></div>
       <div class="field"><label>مصاريف أخرى</label><input id="sh_other" type="number" min="0" step="0.01" dir="ltr" value="${s?.other_costs||0}"></div>
-      <div class="field"><label>ملاحظات</label><textarea id="sh_notes" rows="2">${esc(s?.notes||'')}</textarea></div>
+      <div class="field"><label>ملاحظات ${voiceMicBtn('sh_notes')}</label><textarea id="sh_notes" rows="2">${esc(s?.notes||'')}</textarea></div>
       <button class="btn" id="saveSh">حفظ</button>
       <a class="btn ghost" href="${s ? '#ship/id/'+s.id : '#ship/list'}" style="margin-top:.4rem;display:inline-block">إلغاء</a>
     </div>`, 'more');
+  bindVoiceMic('sh_notes');
   $('#saveSh').onclick = async () => {
     const fx = Number($('#sh_fx').value) || ( $('#sh_cur').value === 'EGP' ? 1 : 0 );
     if(!fx) { $('#msg').innerHTML = '<div class="msg err">أدخل سعر الصرف</div>'; return; }
@@ -1661,7 +1790,9 @@ async function shipDetail(id){
     </div>` : ''}
     ${s.journal_id ? `<div class="card"><div class="k">القيد المحاسبي</div><a href="#fin/journals" style="color:var(--emerald-d);font-size:.85rem">تم الترحيل — راجع دفتر اليومية ←</a></div>` : ''}
     ${s.notes ? `<div class="card"><div class="k">ملاحظات</div><div style="font-size:.85rem">${esc(s.notes)}</div></div>` : ''}
+    ${await attachCard('shipment', id)}
     <div id="modal"></div>`, 'more');
+  bindAttach('shipment', id, () => shipDetail(id));
 
   const rerender = () => shipDetail(id);
   if($('#nextSt')) $('#nextSt').onclick = async () => {
