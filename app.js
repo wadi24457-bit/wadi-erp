@@ -276,7 +276,7 @@ function moreView(){
   shell(`
     <div class="page-title">المزيد</div>
     <div class="cards">
-      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٧ — المخازن والمخزون</div></div>
+      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٨ — الاستيراد والتصدير</div></div>
       <div class="card"><div class="k">العملة الأساسية</div><div class="v" style="font-size:1rem">جنيه مصري (EGP)</div></div>
     </div>
     <div class="card" style="margin-top:1rem"><div class="k">الأقسام</div>
@@ -284,7 +284,7 @@ function moreView(){
       <p style="margin-top:.4rem;font-size:.9rem"><a href="#parties" style="color:var(--emerald-d)">🤝 العملاء والموردون وكشوف الحساب ←</a></p>
       <p style="margin-top:.4rem;font-size:.9rem"><a href="#trade" style="color:var(--emerald-d)">🧾 التوريد والمبيعات والمشتريات ←</a></p>
       <p style="margin-top:.4rem;font-size:.9rem"><a href="#inv" style="color:var(--emerald-d)">📦 المخازن والمخزون ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">قريباً: العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#ship" style="color:var(--emerald-d)">🚢 الاستيراد والتصدير والشحنات ←</a></p>
     </div>`, 'more');
 }
 
@@ -1476,6 +1476,222 @@ async function callFn(action, payload = {}){
   return data;
 }
 
+/* ---------- IMPORT / EXPORT (phase 8) ---------- */
+const SHIP_STATUS = { new:'جديدة', in_transit:'قيد الشحن', customs:'في الجمارك', arrived:'وصلت', cleared:'تم التخليص', completed:'مكتملة', cancelled:'ملغاة' };
+const SHIP_FLOW = ['new','in_transit','customs','arrived','cleared'];
+const INCOTERMS = ['EXW','FOB','CFR','CIF','DAP','DDP','FAS','FCA','CPT','CIP','DPU'];
+
+function shipHome(){
+  if(!can('trade.view') && !can('trade.manage'))
+    return shell(`<div class="page-title">الاستيراد والتصدير</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">الاستيراد والتصدير</div><div class="center"><span class="spin"></span></div>`, 'more');
+  sb.from('v_shipments_delayed').select('*').then(({ data: delayed }) => {
+    shell(`
+      <div class="page-title">الاستيراد والتصدير</div>
+      ${(delayed||[]).length ? `<div class="msg err">⚠️ ${(delayed||[]).length} شحنة متأخرة عن موعد الوصول المتوقع</div>` : ''}
+      <div class="cards">
+        <a href="#ship/list" class="card link-card"><div style="font-size:1.6rem">🚢</div><div class="k" style="font-size:1rem;color:var(--text)">الشحنات</div><div style="font-size:.78rem;color:var(--muted)">تسجيل ومتابعة الشحنات الدولية</div></a>
+        <a href="#ship/new" class="card link-card"><div style="font-size:1.6rem">➕</div><div class="k" style="font-size:1rem;color:var(--text)">شحنة جديدة</div><div style="font-size:.78rem;color:var(--muted)">استيراد أو تصدير</div></a>
+      </div>
+      <div class="toolbar"><a class="btn ghost" href="#more">← المزيد</a></div>`, 'more');
+  });
+}
+
+async function shipmentsView(){
+  if(!can('trade.view') && !can('trade.manage'))
+    return shell(`<div class="page-title">الشحنات</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">الشحنات</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const { data: sh } = await sb.from('v_shipment_summary').select('*').order('created_at', {ascending:false});
+  shell(`
+    <div class="page-title">الشحنات</div>
+    <div class="toolbar">
+      ${can('trade.manage') ? '<a class="btn" href="#ship/new">+ شحنة جديدة</a>' : ''}
+      <a class="btn ghost" href="#ship">← الاستيراد والتصدير</a>
+    </div>
+    <div class="cards">${(sh||[]).map(s => `
+      <a href="#ship/id/${s.id}" class="card link-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b>${esc(s.ref_no)}</b>
+          <span class="badge ${s.status==='completed'?'emerald':'navy'}">${esc(SHIP_STATUS[s.status]||s.status)}</span>
+        </div>
+        <div style="font-size:.82rem;color:var(--muted);margin-top:.3rem">
+          ${s.kind==='import'?'استيراد 📥':'تصدير 📤'} · ${esc(s.origin_country||'')} → ${esc(s.dest_country||'')}
+          ${s.is_delayed ? ' · <b class="neg">متأخرة ⚠️</b>' : ''}
+        </div>
+        <div style="font-size:.82rem;margin-top:.2rem">
+          ${esc(s.foreign_party||'')} ${s.container_no?('· <span dir="ltr">'+esc(s.container_no)+'</span>'):''}
+        </div>
+        <div style="font-size:.85rem;margin-top:.3rem">الإجمالي: <b class="em">${fmt(s.grand_total)} ${esc(s.currency)}</b> <span style="color:var(--muted)">(${money(s.grand_total_base)})</span></div>
+        ${s.eta ? `<div style="font-size:.75rem;color:var(--muted)">الوصول المتوقع: ${esc(s.eta)}</div>` : ''}
+      </a>`).join('') || '<div class="empty">لا توجد شحنات بعد</div>'}
+    </div>`, 'more');
+}
+
+async function shipForm(s){
+  if(!can('trade.manage')) return shell(`<div class="page-title">شحنة</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  const { data: sups } = await sb.from('suppliers').select('id,name').is('deleted_at', null).order('name');
+  shell(`
+    <div class="page-title">${s ? 'تعديل شحنة ' + esc(s.ref_no) : 'شحنة جديدة'}</div>
+    <div id="msg"></div>
+    <div class="card">
+      <div class="field"><label>النوع</label><select id="sh_kind">
+        <option value="import" ${s?.kind==='import'?'selected':''}>استيراد</option>
+        <option value="export" ${s?.kind==='export'?'selected':''}>تصدير</option></select></div>
+      <div class="field"><label>بلد المنشأ</label><input id="sh_origin" value="${esc(s?.origin_country||'')}"></div>
+      <div class="field"><label>بلد الوصول</label><input id="sh_dest" value="${esc(s?.dest_country||'')}"></div>
+      <div class="field"><label>المورد الأجنبي / العميل المستورد</label><input id="sh_party" value="${esc(s?.foreign_party||'')}"></div>
+      <div class="field"><label>ربط بمورد مسجل (اختياري)</label><select id="sh_sup"><option value="">—</option>
+        ${(sups||[]).map(p=>`<option value="${p.id}" ${s?.supplier_id===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>رقم الحاوية / الشحنة</label><input id="sh_cont" dir="ltr" value="${esc(s?.container_no||'')}"></div>
+      <div class="field"><label>شركة الشحن</label><input id="sh_co" value="${esc(s?.shipping_company||'')}"></div>
+      <div class="field"><label>تاريخ الشحن</label><input id="sh_date" type="date" dir="ltr" value="${esc(s?.ship_date||'')}"></div>
+      <div class="field"><label>الوصول المتوقع (ETA)</label><input id="sh_eta" type="date" dir="ltr" value="${esc(s?.eta||'')}"></div>
+      <div class="field"><label>تاريخ الوصول الفعلي</label><input id="sh_arr" type="date" dir="ltr" value="${esc(s?.arrived_at ? String(s.arrived_at).slice(0,10) : '')}"></div>
+      <div class="field"><label>شرط التسليم (Incoterms)</label><select id="sh_inc">
+        ${INCOTERMS.map(i=>`<option ${s?.incoterm===i?'selected':''}>${i}</option>`).join('')}</select></div>
+      <div class="field"><label>العملة</label><select id="sh_cur">
+        ${['USD','EUR','SAR','EGP'].map(c=>`<option ${s?.currency===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>سعر الصرف (للجنيه)</label><input id="sh_fx" type="number" min="0" step="0.0001" dir="ltr" value="${s?.fx_rate||''}" placeholder="مثال: 50"></div>
+      <div class="field"><label>الجمارك والرسوم (بعملة الشحنة)</label><input id="sh_customs" type="number" min="0" step="0.01" dir="ltr" value="${s?.customs||0}"></div>
+      <div class="field"><label>التأمين</label><input id="sh_ins" type="number" min="0" step="0.01" dir="ltr" value="${s?.insurance||0}"></div>
+      <div class="field"><label>مصاريف الموانئ</label><input id="sh_port" type="number" min="0" step="0.01" dir="ltr" value="${s?.port_fees||0}"></div>
+      <div class="field"><label>تكلفة الشحن</label><input id="sh_freight" type="number" min="0" step="0.01" dir="ltr" value="${s?.freight_cost||0}"></div>
+      <div class="field"><label>مصاريف أخرى</label><input id="sh_other" type="number" min="0" step="0.01" dir="ltr" value="${s?.other_costs||0}"></div>
+      <div class="field"><label>ملاحظات</label><textarea id="sh_notes" rows="2">${esc(s?.notes||'')}</textarea></div>
+      <button class="btn" id="saveSh">حفظ</button>
+      <a class="btn ghost" href="${s ? '#ship/id/'+s.id : '#ship/list'}" style="margin-top:.4rem;display:inline-block">إلغاء</a>
+    </div>`, 'more');
+  $('#saveSh').onclick = async () => {
+    const fx = Number($('#sh_fx').value) || ( $('#sh_cur').value === 'EGP' ? 1 : 0 );
+    if(!fx) { $('#msg').innerHTML = '<div class="msg err">أدخل سعر الصرف</div>'; return; }
+    const row = {
+      kind: $('#sh_kind').value, origin_country: $('#sh_origin').value.trim() || null,
+      dest_country: $('#sh_dest').value.trim() || null, foreign_party: $('#sh_party').value.trim() || null,
+      supplier_id: $('#sh_sup').value || null, container_no: $('#sh_cont').value.trim() || null,
+      shipping_company: $('#sh_co').value.trim() || null, ship_date: $('#sh_date').value || null,
+      eta: $('#sh_eta').value || null, arrived_at: $('#sh_arr').value || null,
+      incoterm: $('#sh_inc').value, currency: $('#sh_cur').value, fx_rate: fx,
+      customs: Number($('#sh_customs').value)||0, insurance: Number($('#sh_ins').value)||0,
+      port_fees: Number($('#sh_port').value)||0, freight_cost: Number($('#sh_freight').value)||0,
+      other_costs: Number($('#sh_other').value)||0, notes: $('#sh_notes').value.trim() || null,
+    };
+    let q;
+    if(s) q = sb.from('shipments').update(row).eq('id', s.id);
+    else { row.created_by = session.user.id; q = sb.from('shipments').insert(row).select().single(); }
+    const { data, error } = await q;
+    if(error){ $('#msg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    location.hash = '#ship/id/' + (s ? s.id : data.id);
+  };
+}
+
+async function shipDetail(id){
+  if(!can('trade.view') && !can('trade.manage'))
+    return shell(`<div class="page-title">شحنة</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">شحنة</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const { data: s } = await sb.from('v_shipment_summary').select('*').eq('id', id).single();
+  if(!s) return shell(`<div class="page-title">شحنة</div><div class="empty">الشحنة غير موجودة.</div>`, 'more');
+  const [{ data: items }, { data: landed }, { data: prods }, { data: whs }, { data: boxes }] = await Promise.all([
+    sb.from('shipment_items').select('*').eq('shipment_id', id),
+    sb.from('v_shipment_landed').select('*').eq('shipment_id', id),
+    sb.from('products').select('id,name,sku,unit').is('deleted_at', null).order('name'),
+    sb.from('warehouses').select('id,name').is('deleted_at', null).order('name'),
+    sb.from('cashboxes').select('id,name').is('deleted_at', null).eq('is_active', true).order('name'),
+  ]);
+  const prodById = Object.fromEntries((prods||[]).map(p=>[p.id,p]));
+  const landedByItem = Object.fromEntries((landed||[]).map(l=>[l.id,l]));
+  const canEdit = can('trade.manage') && !s.received_at && s.status !== 'cancelled';
+  const nextStatus = SHIP_FLOW[SHIP_FLOW.indexOf(s.status)+1];
+  shell(`
+    <div class="page-title">شحنة ${esc(s.ref_no)} ${s.is_delayed?'<span class="badge" style="background:#7f1d1d;color:#fff">متأخرة ⚠️</span>':''}</div>
+    <div class="toolbar">
+      ${canEdit ? `<a class="btn ghost" href="#ship/edit/${s.id}">تعديل البيانات</a>` : ''}
+      <a class="btn ghost" href="#ship/list">← الشحنات</a>
+    </div>
+    <div id="msg"></div>
+    <div class="card">
+      <div class="k">${s.kind==='import'?'استيراد 📥':'تصدير 📤'} · <span class="badge ${s.status==='completed'?'emerald':'navy'}">${esc(SHIP_STATUS[s.status]||s.status)}</span></div>
+      <div style="font-size:.85rem;margin-top:.4rem;line-height:1.9">
+        ${esc(s.origin_country||'—')} → ${esc(s.dest_country||'—')} · ${esc(s.incoterm||'')}
+        <br>الطرف الأجنبي: ${esc(s.foreign_party||'—')}
+        ${s.container_no?`<br>الحاوية: <span dir="ltr">${esc(s.container_no)}</span>`:''}
+        ${s.shipping_company?` · ${esc(s.shipping_company)}`:''}
+        <br>الشحن: ${esc(s.ship_date||'—')} · الوصول المتوقع: ${esc(s.eta||'—')} · الوصول الفعلي: ${s.arrived_at?esc(String(s.arrived_at).slice(0,10)):'—'}
+        <br>العملة: ${esc(s.currency)} × ${fmt(s.fx_rate)}
+      </div>
+      ${canEdit && nextStatus ? `<button class="btn" id="nextSt" style="margin-top:.5rem">نقل إلى: ${esc(SHIP_STATUS[nextStatus])}</button>` : ''}
+      ${canEdit && s.status !== 'new' ? '<button class="btn ghost" id="cancelSh" style="margin-top:.4rem">إلغاء الشحنة</button>' : ''}
+    </div>
+    <div class="card">
+      <div class="k">أصناف الشحنة (${s.items_count})</div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>التكلفة النهائية/وحدة</th></tr></thead>
+        <tbody>${(items||[]).map(it => { const p = prodById[it.product_id]||{}; const l = landedByItem[it.id];
+          return `<tr><td><b>${esc(p.name||'')}</b><br><span style="color:var(--muted);font-size:.75rem" dir="ltr">${esc(p.sku||'')}</span></td>
+          <td>${fmt(it.qty)} ${esc(p.unit||'')}</td><td>${fmt(it.unit_cost)} ${esc(s.currency)}</td>
+          <td class="em">${l ? money(l.landed_total_base / it.qty) : '—'}</td></tr>`; }).join('') || '<tr><td colspan="4" class="empty">لا توجد أصناف</td></tr>'}</tbody>
+      </table></div>
+      ${canEdit ? `
+      <div style="display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap">
+        <select id="it_prod" style="flex:1;min-width:140px">${(prods||[]).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+        <input id="it_qty" type="number" min="0" step="0.01" placeholder="الكمية" style="width:90px" dir="ltr">
+        <input id="it_cost" type="number" min="0" step="0.01" placeholder="سعر الوحدة" style="width:100px" dir="ltr">
+        <button class="btn" id="addIt">+ إضافة</button>
+      </div>` : ''}
+    </div>
+    <div class="card">
+      <div class="k">التكاليف (بعملة الشحنة)</div>
+      <div class="tablewrap"><table><tbody>
+        <tr><td>قيمة البضاعة</td><td>${fmt(s.goods_value)}</td></tr>
+        <tr><td>الجمارك والرسوم</td><td>${fmt(s.customs)}</td></tr>
+        <tr><td>التأمين</td><td>${fmt(s.insurance)}</td></tr>
+        <tr><td>مصاريف الموانئ</td><td>${fmt(s.port_fees)}</td></tr>
+        <tr><td>تكلفة الشحن</td><td>${fmt(s.freight_cost)}</td></tr>
+        <tr><td>أخرى</td><td>${fmt(s.other_costs)}</td></tr>
+        <tr><td><b>الإجمالي</b></td><td><b class="em">${fmt(s.grand_total)} ${esc(s.currency)}</b></td></tr>
+        <tr><td>بالجنيه المصري</td><td><b class="em">${money(s.grand_total_base)}</b></td></tr>
+      </tbody></table></div>
+    </div>
+    ${s.kind==='import' && can('trade.manage') && !s.received_at && s.status !== 'cancelled' ? `
+    <div class="card">
+      <div class="k">استلام الشحنة في المخزن</div>
+      <div style="font-size:.8rem;color:var(--muted);margin:.3rem 0">يدخل الأصناف بالتكلفة النهائية (landed cost) ويسجل قيد: مخزون / موردون + مصاريف.</div>
+      <div class="field"><label>المخزن</label><select id="rc_wh">${(whs||[]).map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>سداد المصاريف من خزينة (اختياري — وإلا تسجل مستحقة)</label><select id="rc_cb"><option value="">مستحقة (بدون سداد)</option>${(boxes||[]).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
+      <button class="btn" id="doReceive">استلام وإدخال المخزن</button>
+    </div>` : ''}
+    ${s.journal_id ? `<div class="card"><div class="k">القيد المحاسبي</div><a href="#fin/journals" style="color:var(--emerald-d);font-size:.85rem">تم الترحيل — راجع دفتر اليومية ←</a></div>` : ''}
+    ${s.notes ? `<div class="card"><div class="k">ملاحظات</div><div style="font-size:.85rem">${esc(s.notes)}</div></div>` : ''}
+    <div id="modal"></div>`, 'more');
+
+  const rerender = () => shipDetail(id);
+  if($('#nextSt')) $('#nextSt').onclick = async () => {
+    const upd = { status: nextStatus };
+    if(nextStatus === 'arrived') upd.arrived_at = new Date().toISOString();
+    const { error } = await sb.from('shipments').update(upd).eq('id', id);
+    if(error){ $('#msg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    rerender();
+  };
+  if($('#cancelSh')) $('#cancelSh').onclick = async () => {
+    if(!confirm('إلغاء الشحنة؟')) return;
+    await sb.from('shipments').update({ status: 'cancelled' }).eq('id', id);
+    rerender();
+  };
+  if($('#addIt')) $('#addIt').onclick = async () => {
+    const qty = Number($('#it_qty').value), cost = Number($('#it_cost').value);
+    if(!qty || qty <= 0) { $('#msg').innerHTML = '<div class="msg err">أدخل كمية صحيحة</div>'; return; }
+    const { error } = await sb.from('shipment_items').insert({ shipment_id: id, product_id: $('#it_prod').value, qty, unit_cost: cost||0 });
+    if(error){ $('#msg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    rerender();
+  };
+  if($('#doReceive')) $('#doReceive').onclick = async () => {
+    $('#msg').innerHTML = '<div class="center"><span class="spin"></span></div>';
+    const { error } = await sb.rpc('receive_shipment', { p_shipment: id, p_warehouse: $('#rc_wh').value, p_cashbox: $('#rc_cb').value || null });
+    if(error){ $('#msg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    $('#msg').innerHTML = '<div class="msg ok">تم الاستلام وترحيل القيد ✓</div>';
+    setTimeout(rerender, 700);
+  };
+}
+
 async function render(){
   if(!session){ loginView(); return; }
   if(!profile){ await loadProfile(); }
@@ -1515,6 +1731,14 @@ async function render(){
     if(sub === 'supply') return supplyView();
     if(sub === 'invoice') return invoiceDetail(parts[2]);
     return tradeHome();
+  }
+  if(root === 'ship'){
+    const parts = h.split('/');
+    if(sub === 'list') return shipmentsView();
+    if(sub === 'new') return shipForm(null);
+    if(sub === 'edit'){ const { data } = await sb.from('shipments').select('*').eq('id', parts[2]).single(); return shipForm(data); }
+    if(sub === 'id') return shipDetail(parts[2]);
+    return shipHome();
   }
   if(root === 'inv'){
     if(sub === 'warehouses') return warehousesView();
