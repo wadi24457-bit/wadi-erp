@@ -113,22 +113,64 @@ function shell(content, active){
 }
 
 async function dashView(){
+  if(!can('dashboard.view')) return shell(`<div class="page-title">لوحة التحكم</div><div class="empty">لا تملك صلاحية عرض لوحة التحكم.</div>`, 'dash');
   shell(`<div class="page-title">لوحة التحكم</div><div class="center"><span class="spin"></span></div>`, 'dash');
-  const [users] = await Promise.all([
-    can('users.manage') ? callFn('list_users').catch(()=>null) : null,
+  const [today, cash, boxes, parties, low, inv, activity] = await Promise.all([
+    sb.from('v_dash_today').select('*').maybeSingle(),
+    sb.from('v_dash_cash_today').select('*').maybeSingle(),
+    sb.from('v_cashbox_balances').select('*'),
+    sb.from('v_party_balances').select('*'),
+    sb.from('v_low_stock').select('*').limit(10),
+    sb.from('v_dash_inventory_value').select('*').maybeSingle(),
+    can('audit.view') ? sb.from('audit_log').select('*').order('created_at',{ascending:false}).limit(6) : Promise.resolve({data:[]}),
   ]);
+  const t = today.data || {}, c = cash.data || {}, iv = inv.data || {};
+  const recv = ((parties.data||[]).find(r=>r.party_type==='customer')||{}).open_balance || 0;
+  const payb = ((parties.data||[]).find(r=>r.party_type==='supplier')||{}).open_balance || 0;
+  const lowItems = low.data || [];
+  const totalCash = (boxes.data||[]).reduce((s,b)=>s+Number(b.balance||0),0);
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? 'صباح الخير' : 'مساء الخير';
+  const dateStr = new Date().toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  const card = (k, v, cls='') => `<div class="card"><div class="k">${k}</div><div class="v ${cls}">${v === null ? '—' : v}</div></div>`;
   shell(`
-    <div class="page-title">لوحة التحكم</div>
+    <div class="page-title">${greet}، ${esc(profile.full_name.split(' ')[0])} 👋</div>
+    <div style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">${dateStr}</div>
     <div class="cards">
-      <div class="card"><div class="k">المستخدمون النشطون</div><div class="v em">${users ? users.users.filter(u=>u.is_active).length : '—'}</div></div>
-      <div class="card"><div class="k">إجمالي المبيعات</div><div class="v">—</div></div>
-      <div class="card"><div class="k">إجمالي المصروفات</div><div class="v">—</div></div>
-      <div class="card"><div class="k">قيمة المخزون</div><div class="v">—</div></div>
+      ${card('مبيعات اليوم', fmt(t.sales_today) + ' ج.م', 'em')}
+      ${card('مشتريات اليوم', fmt(t.purchases_today) + ' ج.م')}
+      ${card('مقبوضات اليوم', fmt(c.receipts_today) + ' ج.م', 'em')}
+      ${card('مدفوعات اليوم', fmt(c.payments_today) + ' ج.م')}
+      ${card('إجمالي أرصدة الخزائن', fmt(totalCash) + ' ج.م', 'em')}
+      ${card('مستحقات العملاء', fmt(recv) + ' ج.م')}
+      ${card('مستحقات الموردين', fmt(payb) + ' ج.م')}
+      ${card('قيمة المخزون', fmt(iv.stock_value) + ' ج.م')}
     </div>
+    ${lowItems.length ? `
+    <div class="card" style="margin-top:1rem;border-color:#f59e0b">
+      <div class="k">⚠️ أصناف تحت حد الطلب (${lowItems.length})</div>
+      <div class="tablewrap" style="margin-top:.5rem"><table>
+        <thead><tr><th>الصنف</th><th>المخزن</th><th>المتاح</th><th>الحد</th></tr></thead>
+        <tbody>${lowItems.map(p=>`<tr><td><b>${esc(p.name)}</b><br><span style="color:var(--muted);font-size:.75rem" dir="ltr">${esc(p.sku)}</span></td><td>${esc(p.warehouse_name)}</td><td>${fmt(p.on_hand)} ${esc(p.unit)}</td><td>${fmt(p.min_stock)}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>` : ''}
+    ${(boxes.data||[]).length ? `
     <div class="card" style="margin-top:1rem">
-      <div class="k">الحالة</div>
-      <p style="margin-top:.4rem; font-size:.9rem; color:var(--muted)">المرحلة الأولى جاهزة: قاعدة البيانات ونظام المستخدمين والصلاحيات وسجل الأنشطة. باقي الوحدات (الحسابات، المخازن، المبيعات...) تُبنى تباعاً وستظهر هنا.</p>
-    </div>`, 'dash');
+      <div class="k">الخزائن والبنوك</div>
+      <div class="tablewrap" style="margin-top:.5rem"><table>
+        <thead><tr><th>الخزينة</th><th>النوع</th><th>الرصيد</th></tr></thead>
+        <tbody>${(boxes.data||[]).map(b=>`<tr><td>${esc(b.name)}</td><td>${b.kind==='bank'?'بنك':'نقدية'}</td><td class="em">${fmt(b.balance)} ج.م</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>` : ''}
+    ${(activity.data||[]).length ? `
+    <div class="card" style="margin-top:1rem">
+      <div class="k">آخر الأنشطة</div>
+      <div style="margin-top:.5rem">${(activity.data||[]).map(r=>`
+        <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.85rem">
+          <span>${esc(r.action)} · ${esc(r.table_name||'')}</span>
+          <span style="color:var(--muted);font-size:.75rem">${new Date(r.created_at).toLocaleString('ar-EG')}</span>
+        </div>`).join('')}</div>
+    </div>` : ''}`, 'dash');
 }
 
 async function usersView(){
@@ -234,11 +276,11 @@ function moreView(){
   shell(`
     <div class="page-title">المزيد</div>
     <div class="cards">
-      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ١ — التأسيس</div></div>
+      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٢ — لوحة التحكم</div></div>
       <div class="card"><div class="k">العملة الأساسية</div><div class="v" style="font-size:1rem">جنيه مصري (EGP)</div></div>
     </div>
     <div class="card" style="margin-top:1rem"><div class="k">قريباً</div>
-      <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">الحسابات والخزائن · المصروفات والسلف والموظفون · العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
+      <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">الحسابات والخزائن (المرحلة التالية) · المصروفات والسلف والموظفون · العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
     </div>`, 'more');
 }
 
