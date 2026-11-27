@@ -363,7 +363,7 @@ function finHome(){
   shell(`
     <div class="page-title">الحسابات والخزائن</div>
     <div class="cards">
-      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div class="big-ic">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
     </div>`, 'fin');
 }
 
@@ -748,7 +748,7 @@ function hrHome(){
   shell(`
     <div class="page-title">الموظفون والموارد البشرية</div>
     <div class="cards">
-      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div class="big-ic">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
     </div>`, 'more');
 }
 
@@ -991,7 +991,7 @@ function partiesHome(){
   shell(`
     <div class="page-title">العملاء والموردون</div>
     <div class="cards">
-      ${items.map(([h,t,i,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+      ${items.map(([h,t,i,d]) => `<a href="#${h}" class="card link-card"><div class="big-ic">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
     </div>`, 'more');
 }
 
@@ -1114,7 +1114,7 @@ function tradeHome(){
   shell(`
     <div class="page-title">التوريد والمبيعات والمشتريات</div>
     <div class="cards">
-      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div class="big-ic">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
     </div>`, 'more');
 }
 
@@ -1332,7 +1332,7 @@ function invHome(){
   shell(`
     <div class="page-title">المخازن والمخزون</div>
     <div class="cards">
-      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div class="big-ic">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
     </div>`, 'more');
 }
 
@@ -1927,7 +1927,7 @@ function reportsHome(){
   shell(`
     <div class="page-title">مركز التقارير</div>
     <div class="cards">${Object.entries(REPORTS).map(([k, r]) => `
-      <a href="#rep/${k}" class="card link-card"><div style="font-size:1.6rem">${r.i}</div>
+      <a href="#rep/${k}" class="card link-card"><div class="big-ic">${r.i}</div>
       <div class="k" style="font-size:1rem;color:var(--text)">${r.t}</div></a>`).join('')}
     </div>
     <div class="toolbar"><a class="btn ghost" href="#more">← المزيد</a></div>`, 'more');
