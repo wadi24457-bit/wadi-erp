@@ -276,11 +276,12 @@ function moreView(){
   shell(`
     <div class="page-title">المزيد</div>
     <div class="cards">
-      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٤ — المصروفات والموظفون والسلف</div></div>
+      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٥ — العملاء والموردون</div></div>
       <div class="card"><div class="k">العملة الأساسية</div><div class="v" style="font-size:1rem">جنيه مصري (EGP)</div></div>
     </div>
     <div class="card" style="margin-top:1rem"><div class="k">الأقسام</div>
       <p style="margin-top:.4rem;font-size:.9rem"><a href="#hr" style="color:var(--emerald-d)">🧑‍💼 الموظفون والموارد البشرية والسلف ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#parties" style="color:var(--emerald-d)">🤝 العملاء والموردون وكشوف الحساب ←</a></p>
       <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">قريباً: العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
     </div>`, 'more');
 }
@@ -907,6 +908,124 @@ async function advancesView(){
   });
 }
 
+/* ---------- PARTIES (phase 5) ---------- */
+function partiesHome(){
+  if(!can('parties.view') && !can('parties.manage'))
+    return shell(`<div class="page-title">العملاء والموردون</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  const items = [
+    ['parties/customers','العملاء','🤝','ملفات العملاء وأرصدتهم وكشوف الحساب'],
+    ['parties/suppliers','الموردون','🏭','ملفات الموردين المحليين والأجانب وكشوف الحساب'],
+  ];
+  shell(`
+    <div class="page-title">العملاء والموردون</div>
+    <div class="cards">
+      ${items.map(([h,t,i,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+    </div>`, 'more');
+}
+
+async function partyView(type){
+  if(!can('parties.view') && !can('parties.manage')) return shell(`<div class="page-title">—</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  const isCust = type === 'customers';
+  const title = isCust ? 'العملاء' : 'الموردون';
+  shell(`<div class="page-title">${title}</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const [{ data: parties }, { data: sums }] = await Promise.all([
+    sb.from(type).select('*').is('deleted_at', null).order('created_at', {ascending:false}),
+    sb.from('v_party_summary').select('*').eq('party_type', isCust ? 'customer' : 'supplier'),
+  ]);
+  const byId = Object.fromEntries((sums||[]).map(s=>[s.party_id, s]));
+  const rows = (parties||[]).map(p => { const s = byId[p.id] || {}; return `
+    <tr><td><b>${esc(p.name)}</b><br><span style="color:var(--muted);font-size:.78rem" dir="ltr">${esc(p.code)}</span></td>
+    <td>${esc(p.contact_person||'—')}<br><span style="color:var(--muted);font-size:.78rem" dir="ltr">${esc(p.phone||'')}</span></td>
+    <td>${esc(p.country||'')}</td>
+    <td class="${Number(s.balance||0) > 0 ? (isCust?'neg':'') : ''}">${money(s.balance||0)}</td>
+    <td class="row-actions">
+      <a href="#parties/statement/${isCust?'customer':'supplier'}/${p.id}"><button>كشف حساب</button></a>
+      ${can('parties.manage') ? `<button data-edit="${p.id}">تعديل</button>` : ''}
+    </td></tr>`; }).join('');
+  shell(`
+    <div class="page-title">${title}</div>
+    <div class="toolbar">
+      ${can('parties.manage') ? `<button class="btn" id="addP">+ ${isCust?'عميل':'مورد'} جديد</button>` : ''}
+      <a class="btn ghost" href="#parties">← العملاء والموردون</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>الاسم</th><th>المسؤول / الهاتف</th><th>الدولة</th><th>${isCust?'المستحق عليه':'المستحق له'}</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="5" class="empty">لا يوجد ${title} بعد</td></tr>`}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'more');
+  if(can('parties.manage')){
+    $('#addP').onclick = () => partyForm(type, null);
+    document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => partyForm(type, (parties||[]).find(p=>p.id===b.dataset.edit)));
+  }
+}
+
+function partyForm(type, p){
+  const isCust = type === 'customers';
+  $('#modal').innerHTML = `
+  <div class="modal-bg"><div class="modal">
+    <h3>${p ? 'تعديل' : 'إضافة'} ${isCust?'عميل':'مورد'}</h3><div id="mmsg"></div>
+    <div class="field"><label>الاسم التجاري</label><input id="p_name" value="${esc(p?.name||'')}"></div>
+    <div class="field"><label>الشخص المسؤول</label><input id="p_contact" value="${esc(p?.contact_person||'')}"></div>
+    <div class="field"><label>الهاتف</label><input id="p_phone" dir="ltr" value="${esc(p?.phone||'')}"></div>
+    <div class="field"><label>البريد الإلكتروني</label><input id="p_email" dir="ltr" value="${esc(p?.email||'')}"></div>
+    <div class="field"><label>العنوان</label><input id="p_addr" value="${esc(p?.address||'')}"></div>
+    <div class="field"><label>الرقم الضريبي</label><input id="p_tax" dir="ltr" value="${esc(p?.tax_number||'')}"></div>
+    <div class="field"><label>الدولة</label><input id="p_country" value="${esc(p?.country||'EG')}"></div>
+    ${!p ? `<div class="field"><label>رصيد افتتاحي (${isCust?'مستحق عليه':'مستحق له'})</label><input id="p_open" type="number" min="0" step="0.01" dir="ltr" value="0"></div>` : ''}
+    <div class="field"><label>ملاحظات داخلية</label><input id="p_notes" value="${esc(p?.notes||'')}"></div>
+    <button class="btn" id="saveP">حفظ</button>
+    <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button>
+  </div></div>`;
+  $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  $('#saveP').onclick = async () => {
+    const body = { name: $('#p_name').value.trim(), contact_person: $('#p_contact').value.trim(),
+      phone: $('#p_phone').value.trim(), email: $('#p_email').value.trim(), address: $('#p_addr').value.trim(),
+      tax_number: $('#p_tax').value.trim(), country: $('#p_country').value.trim() || 'EG', notes: $('#p_notes').value.trim() };
+    if(!body.name){ $('#mmsg').innerHTML = `<div class="msg err">أدخل الاسم.</div>`; return; }
+    let error;
+    if(p){ ({ error } = await sb.from(type).update(body).eq('id', p.id)); }
+    else { ({ error } = await sb.from(type).insert({...body, opening_balance: Number($('#p_open').value)||0, created_by: session.user.id})); }
+    if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    $('#modal').innerHTML = ''; partyView(type);
+  };
+}
+
+async function statementView(ptype, pid){
+  if(!can('parties.view') && !can('parties.manage') && !can('accounting.view'))
+    return shell(`<div class="page-title">كشف حساب</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  const isCust = ptype === 'customer';
+  const table = isCust ? 'customers' : 'suppliers';
+  shell(`<div class="page-title">كشف حساب</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const [{ data: p }, { data: lines }] = await Promise.all([
+    sb.from(table).select('*').eq('id', pid).single(),
+    sb.from('v_party_statement').select('*').eq('party_type', ptype).eq('party_id', pid).order('date'),
+  ]);
+  if(!p) return shell(`<div class="page-title">كشف حساب</div><div class="empty">الطرف غير موجود.</div>`, 'more');
+  let run = 0;
+  const DOC = { opening:'رصيد افتتاحي', sale:'فاتورة بيع', purchase:'فاتورة شراء', sale_return:'مرتجع بيع', purchase_return:'مرتجع شراء', receipt:'سند قبض', payment:'سند صرف' };
+  const rows = (lines||[]).map(l => {
+    run += Number(l.debit||0) - Number(l.credit||0);
+    return `<tr><td>${new Date(l.date).toLocaleDateString('ar-EG')}</td><td>${DOC[l.doc_type]||l.doc_type}</td>
+      <td dir="ltr" style="text-align:right">${esc(l.ref_no||'')}</td>
+      <td>${l.debit ? fmt(l.debit) : ''}</td><td>${l.credit ? fmt(l.credit) : ''}</td>
+      <td><b>${fmt(run)}</b></td></tr>`;
+  }).join('');
+  shell(`
+    <div class="page-title">كشف حساب — ${esc(p.name)}</div>
+    <div style="color:var(--muted);font-size:.85rem;margin-bottom:.8rem">${isCust?'عميل':'مورد'} · <span dir="ltr">${esc(p.code)}</span>${p.phone ? ' · <span dir="ltr">'+esc(p.phone)+'</span>' : ''}${p.country ? ' · '+esc(p.country) : ''}</div>
+    <div class="cards" style="margin-bottom:1rem">
+      <div class="card"><div class="k">إجمالي مدين</div><div class="v">${money((lines||[]).reduce((s,l)=>s+Number(l.debit||0),0))}</div></div>
+      <div class="card"><div class="k">إجمالي دائن</div><div class="v">${money((lines||[]).reduce((s,l)=>s+Number(l.credit||0),0))}</div></div>
+      <div class="card"><div class="k">الرصيد</div><div class="v ${run ? (isCust?'':'em') : 'em'}">${money(run)}</div></div>
+    </div>
+    <div class="toolbar"><a class="btn ghost" href="#parties/${table}">← ${isCust?'العملاء':'الموردون'}</a></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>التاريخ</th><th>المستند</th><th>المرجع</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" class="empty">لا توجد حركات بعد — ستظهر الفواتير والسندات هنا تلقائياً</td></tr>'}</tbody>
+    </table></div>`, 'more');
+}
+
 async function callFn(action, payload = {}){
   const res = await fetch(`${SUPA_URL}/functions/v1/admin-users`, {
     method: 'POST',
@@ -942,6 +1061,12 @@ async function render(){
     if(sub === 'leaves') return leavesView();
     if(sub === 'advances') return advancesView();
     return hrHome();
+  }
+  if(root === 'parties'){
+    const parts = h.split('/');
+    if(sub === 'customers' || sub === 'suppliers') return partyView(sub);
+    if(sub === 'statement') return statementView(parts[2], parts[3]);
+    return partiesHome();
   }
   return dashView();
 }
