@@ -7,7 +7,7 @@ export const sb = createClient(SUPA_URL, SUPA_KEY);
 const $ = (s, el=document) => el.querySelector(s);
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt = n => new Intl.NumberFormat('ar-EG', {maximumFractionDigits:2}).format(Number(n||0));
+const fmt = n => new Intl.NumberFormat('ar-EG-u-nu-latn', {maximumFractionDigits:2}).format(Number(n||0));
 
 const ROLES = {
   super_admin:'المدير العام (Super Admin)', owner:'المالك', general_manager:'مدير عام',
@@ -177,7 +177,7 @@ async function dashView(){
   const totalCash = (boxes.data||[]).reduce((s,b)=>s+Number(b.balance||0),0);
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'صباح الخير' : 'مساء الخير';
-  const dateStr = new Date().toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  const dateStr = new Date().toLocaleDateString('ar-EG-u-nu-latn', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
   const stat = (ic, k, v, cls='') => `<div class="stat"><div class="si">${ic}</div><div><div class="sk">${k}</div><div class="sv ${cls}">${v === null ? '—' : v}</div></div></div>`;
   shell(`
     <div class="dash-hero">
@@ -215,8 +215,8 @@ async function dashView(){
       <div class="k">آخر الأنشطة</div>
       <div style="margin-top:.5rem">${(activity.data||[]).map(r=>`
         <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.85rem">
-          <span>${esc(r.action)} · ${esc(r.table_name||'')}</span>
-          <span style="color:var(--muted);font-size:.75rem">${new Date(r.created_at).toLocaleString('ar-EG')}</span>
+          <span>${esc(auditText(r))}</span>
+          <span style="color:var(--muted);font-size:.75rem">${new Date(r.created_at).toLocaleString('ar-EG-u-nu-latn')}</span>
         </div>`).join('')}</div>
     </div>` : ''}`, 'dash');
 }
@@ -309,14 +309,13 @@ async function auditView(){
   shell(`<div class="page-title">سجل الأنشطة</div><div class="center"><span class="spin"></span></div>`, 'audit');
   const { data } = await sb.from('audit_log').select('*').order('created_at', {ascending:false}).limit(100);
   const rows = (data||[]).map(r => `
-    <tr><td style="white-space:nowrap">${new Date(r.created_at).toLocaleString('ar-EG')}</td>
-    <td>${esc(r.action)}</td><td>${esc(r.table_name||'')}</td>
-    <td style="font-size:.75rem;color:var(--muted)" dir="ltr">${esc((r.record_id||'').slice(0,8))}</td></tr>`).join('');
+    <tr><td style="white-space:nowrap;font-size:.8rem">${new Date(r.created_at).toLocaleString('ar-EG-u-nu-latn')}</td>
+    <td>${esc(auditText(r))}</td></tr>`).join('');
   shell(`
     <div class="page-title">سجل الأنشطة</div>
     <div class="tablewrap"><table>
-      <thead><tr><th>الوقت</th><th>الإجراء</th><th>الجدول</th><th>السجل</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="4" class="empty">لا يوجد نشاط بعد</td></tr>'}</tbody>
+      <thead><tr><th>الوقت</th><th>الإجراء</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="2" class="empty">لا يوجد نشاط بعد</td></tr>'}</tbody>
     </table></div>`, 'audit');
 }
 
@@ -344,6 +343,11 @@ function moreView(){
 const ACCT_TYPES = { asset:'أصول', liability:'خصوم', equity:'حقوق ملكية', revenue:'إيرادات', expense:'مصروفات' };
 const PARTY_TYPES = { customer:'عميل', supplier:'مورد', employee:'موظف', other:'أخرى' };
 const money = n => fmt(n) + ' ج.م';
+const AUDIT_ACTIONS = {insert:'إضافة', update:'تعديل', delete:'حذف'};
+const AUDIT_TABLES = {products:'منتج', invoice_lines:'بند فاتورة', invoices:'فاتورة', customers:'عميل', suppliers:'مورد', payments:'سند قبض/صرف', expenses:'مصروف', journals:'قيد يومية', journal_lines:'بند قيد', accounts:'حساب', cashboxes:'خزينة', employees:'موظف', advances:'سلفة', advance_installments:'قسط سلفة', leaves:'طلب إجازة', attendance:'سجل حضور', shipments:'شحنة', shipment_items:'بند شحنة', warehouses:'مخزن', stock_moves:'حركة مخزون', supply_requests:'طلب توريد', budgets:'ميزانية', branches:'فرع', currencies:'عملة', fx_rates:'سعر صرف', attachments:'مرفق', profiles:'مستخدم', role_permissions:'صلاحيات', notifications:'تنبيه', app_settings:'إعدادات'};
+const auditLabel = r => { const d = r.new_data || r.old_data || {}; return d.name || d.full_name || d.ref_no || d.sku || d.label || d.title || ''; };
+const auditText = r => { const a = AUDIT_ACTIONS[r.action] || r.action; const t = AUDIT_TABLES[r.table_name] || r.table_name || ''; const l = auditLabel(r); return `${a} ${t}${l ? ': ' + l : ''}`.trim(); };
+
 
 function finHome(){
   if(!can('accounting.view') && !can('treasury.manage'))
@@ -460,7 +464,7 @@ async function vouchersView(){
     <tr>
       <td><span class="badge ${p.kind==='receipt'?'green':'red'}">${p.kind==='receipt'?'قبض':'صرف'}</span></td>
       <td dir="ltr" style="text-align:right">${esc(p.ref_no)}</td>
-      <td>${new Date(p.date).toLocaleDateString('ar-EG')}</td>
+      <td>${new Date(p.date).toLocaleDateString('ar-EG-u-nu-latn')}</td>
       <td><b>${fmt(p.amount)} ${esc(p.currency)}</b>${p.fx_rate !== 1 ? `<br><span style="font-size:.72rem;color:var(--muted)">صرف ${fmt(p.fx_rate)}</span>` : ''}</td>
       <td>${esc(p.cashboxes?.name||'')}</td>
       <td>${PARTY_TYPES[p.party_type]||'—'}</td>
@@ -526,7 +530,7 @@ async function journalsView(){
   const rows = (js||[]).map(j => `
     <tr>
       <td dir="ltr" style="text-align:right">${esc(j.ref_no)}</td>
-      <td>${new Date(j.date).toLocaleDateString('ar-EG')}</td>
+      <td>${new Date(j.date).toLocaleDateString('ar-EG-u-nu-latn')}</td>
       <td>${esc(j.description)}</td>
       <td>${st(j.status)}</td>
       <td class="row-actions">
@@ -568,7 +572,7 @@ async function journalDetail(id){
   $('#modal').innerHTML = `
   <div class="modal-bg"><div class="modal">
     <h3 dir="ltr" style="text-align:right">${esc(j.ref_no)}</h3>
-    <p style="font-size:.85rem;color:var(--muted)">${new Date(j.date).toLocaleDateString('ar-EG')} · ${esc(j.description)}</p>
+    <p style="font-size:.85rem;color:var(--muted)">${new Date(j.date).toLocaleDateString('ar-EG-u-nu-latn')} · ${esc(j.description)}</p>
     <div class="tablewrap"><table>
       <thead><tr><th>الحساب</th><th>مدين</th><th>دائن</th></tr></thead>
       <tbody>${(lines||[]).map(l=>`<tr><td><span dir="ltr">${esc(l.accounts?.code||'')}</span> ${esc(l.accounts?.name||'')}</td><td>${l.debit?fmt(l.debit):''}</td><td>${l.credit?fmt(l.credit):''}</td></tr>`).join('')}</tbody>
@@ -641,7 +645,7 @@ async function expensesView(){
     sb.from('v_budget_compare').select('*').eq('month', month),
   ]);
   const rows = (exps||[]).map(e => `
-    <tr><td dir="ltr" style="text-align:right">${esc(e.ref_no)}</td><td>${new Date(e.date).toLocaleDateString('ar-EG')}</td>
+    <tr><td dir="ltr" style="text-align:right">${esc(e.ref_no)}</td><td>${new Date(e.date).toLocaleDateString('ar-EG-u-nu-latn')}</td>
     <td>${esc(e.category)}</td><td><b>${fmt(e.amount)} ${esc(e.currency)}</b></td>
     <td>${esc(e.cashboxes?.name||'—')}</td><td>${esc(e.responsible||'')}</td>
     <td style="font-size:.78rem;color:var(--muted)">${esc(e.notes||'')}</td>
@@ -815,7 +819,7 @@ async function attendanceView(){
   const byEmp = Object.fromEntries((att||[]).map(a=>[a.employee_id, a]));
   const ATT_ST = { present:'حاضر', absent:'غائب', leave:'إجازة', late:'متأخر' };
   shell(`
-    <div class="page-title">حضور اليوم — ${new Date().toLocaleDateString('ar-EG')}</div>
+    <div class="page-title">حضور اليوم — ${new Date().toLocaleDateString('ar-EG-u-nu-latn')}</div>
     <div class="toolbar"><a class="btn ghost" href="#hr">← الموظفون</a></div>
     <div id="msg"></div>
     <div class="tablewrap"><table>
@@ -823,8 +827,8 @@ async function attendanceView(){
       <tbody>${(emps||[]).map(e => { const a = byEmp[e.id]; return `
         <tr><td><b>${esc(e.name)}</b></td>
         <td>${a ? `<span class="badge ${a.status==='present'?'green':a.status==='absent'?'red':'navy'}">${ATT_ST[a.status]}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
-        <td>${a?.check_in ? new Date(a.check_in).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
-        <td>${a?.check_out ? new Date(a.check_out).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+        <td>${a?.check_in ? new Date(a.check_in).toLocaleTimeString('ar-EG-u-nu-latn',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+        <td>${a?.check_out ? new Date(a.check_out).toLocaleTimeString('ar-EG-u-nu-latn',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
         ${can('hr.manage') ? `<td class="row-actions">
           <button data-in="${e.id}">تسجيل حضور</button>
           ${a && !a.check_out ? `<button data-out="${a.id}">انصراف</button>` : ''}
@@ -862,7 +866,7 @@ async function leavesView(){
     <div class="tablewrap"><table>
       <thead><tr><th>الموظف</th><th>النوع</th><th>من</th><th>إلى</th><th>الحالة</th><th></th></tr></thead>
       <tbody>${(lv||[]).map(l => `<tr><td><b>${esc(l.employees?.name||'')}</b></td><td>${esc(l.kind)}</td>
-        <td>${new Date(l.from_date).toLocaleDateString('ar-EG')}</td><td>${new Date(l.to_date).toLocaleDateString('ar-EG')}</td><td>${st(l.status)}</td>
+        <td>${new Date(l.from_date).toLocaleDateString('ar-EG-u-nu-latn')}</td><td>${new Date(l.to_date).toLocaleDateString('ar-EG-u-nu-latn')}</td><td>${st(l.status)}</td>
         <td class="row-actions">${l.status==='pending' && can('hr.manage') ? `<button data-ok="${l.id}">قبول</button><button data-no="${l.id}">رفض</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد طلبات</td></tr>'}</tbody>
     </table></div>
     <div id="modal"></div>`, 'more');
@@ -964,8 +968,8 @@ async function advancesView(){
     $('#modal').innerHTML = `
     <div class="modal-bg"><div class="modal"><h3>جدول الأقساط</h3>
       <div class="tablewrap"><table><thead><tr><th>الاستحقاق</th><th>القسط</th><th>السداد</th><th></th></tr></thead>
-      <tbody>${(insts||[]).map(i=>`<tr><td>${new Date(i.due_date).toLocaleDateString('ar-EG')}</td><td>${money(i.amount)}</td>
-        <td>${i.paid_date ? new Date(i.paid_date).toLocaleDateString('ar-EG') : '—'}</td>
+      <tbody>${(insts||[]).map(i=>`<tr><td>${new Date(i.due_date).toLocaleDateString('ar-EG-u-nu-latn')}</td><td>${money(i.amount)}</td>
+        <td>${i.paid_date ? new Date(i.paid_date).toLocaleDateString('ar-EG-u-nu-latn') : '—'}</td>
         <td>${!i.paid_date && (can('advances.manage')||can('hr.manage')) ? `<button data-pay="${i.id}">تسجيل سداد</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
       <button class="btn ghost" id="closeModal" style="margin-top:.6rem">إغلاق</button></div></div>`;
     $('#closeModal').onclick = () => $('#modal').innerHTML = '';
@@ -1074,7 +1078,7 @@ async function statementView(ptype, pid){
   const DOC = { opening:'رصيد افتتاحي', sale:'فاتورة بيع', purchase:'فاتورة شراء', sale_return:'مرتجع بيع', purchase_return:'مرتجع شراء', receipt:'سند قبض', payment:'سند صرف' };
   const rows = (lines||[]).map(l => {
     run += Number(l.debit||0) - Number(l.credit||0);
-    return `<tr><td>${new Date(l.date).toLocaleDateString('ar-EG')}</td><td>${DOC[l.doc_type]||l.doc_type}</td>
+    return `<tr><td>${new Date(l.date).toLocaleDateString('ar-EG-u-nu-latn')}</td><td>${DOC[l.doc_type]||l.doc_type}</td>
       <td dir="ltr" style="text-align:right">${esc(l.ref_no||'')}</td>
       <td>${l.debit ? fmt(l.debit) : ''}</td><td>${l.credit ? fmt(l.credit) : ''}</td>
       <td><b>${fmt(run)}</b></td></tr>`;
@@ -1128,7 +1132,7 @@ async function invoicesView(kind){
   const stBadge = s => `<span class="badge ${s==='completed'||s==='approved'?'green':s==='cancelled'?'red':'navy'}">${INV_STATUS[s]||s}</span>`;
   const rows = (invs||[]).map(i => `
     <tr><td dir="ltr" style="text-align:right"><a href="#trade/invoice/${i.id}" style="color:var(--emerald-d)">${esc(i.ref_no)}</a></td>
-    <td>${new Date(i.date).toLocaleDateString('ar-EG')}</td>
+    <td>${new Date(i.date).toLocaleDateString('ar-EG-u-nu-latn')}</td>
     <td><b>${esc(byId[i.party_id]||'—')}</b></td>
     <td><b>${fmt(i.total)} ${esc(i.currency)}</b></td>
     <td>${fmt(i.paid||0)}</td>
@@ -1211,7 +1215,7 @@ async function invoiceDetail(id){
   const kindTitle = { sale:'فاتورة بيع', purchase:'فاتورة شراء', quote:'عرض سعر', sale_return:'مرتجع بيع', purchase_return:'مرتجع شراء' }[inv.kind];
   shell(`
     <div class="page-title">${kindTitle} <span dir="ltr">${esc(inv.ref_no)}</span></div>
-    <div style="color:var(--muted);font-size:.85rem;margin-bottom:.8rem">${esc(party?.name||'')} · ${new Date(inv.date).toLocaleDateString('ar-EG')} · <span class="badge ${inv.status==='cancelled'?'red':'navy'}">${INV_STATUS[inv.status]}</span></div>
+    <div style="color:var(--muted);font-size:.85rem;margin-bottom:.8rem">${esc(party?.name||'')} · ${new Date(inv.date).toLocaleDateString('ar-EG-u-nu-latn')} · <span class="badge ${inv.status==='cancelled'?'red':'navy'}">${INV_STATUS[inv.status]}</span></div>
     <div class="toolbar">
       ${next && can(perm) ? `<button class="btn" id="nextSt">→ ${INV_STATUS[next]}</button>` : ''}
       ${inv.status!=='cancelled' && inv.status!=='completed' && can(perm) ? '<button class="btn ghost" id="cancelI">إلغاء المستند</button>' : ''}
@@ -1233,7 +1237,7 @@ async function invoiceDetail(id){
     </div>
     ${(pays||[]).length ? `<div class="card" style="margin-top:1rem"><div class="k">الدفعات</div>
       <div class="tablewrap" style="margin-top:.5rem"><table><thead><tr><th>المرجع</th><th>التاريخ</th><th>المبلغ</th><th>الخزينة</th></tr></thead>
-      <tbody>${pays.map(p=>`<tr><td dir="ltr" style="text-align:right">${esc(p.ref_no)}</td><td>${new Date(p.date).toLocaleDateString('ar-EG')}</td><td>${fmt(p.amount)}</td><td>${esc(p.cashboxes?.name||'')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+      <tbody>${pays.map(p=>`<tr><td dir="ltr" style="text-align:right">${esc(p.ref_no)}</td><td>${new Date(p.date).toLocaleDateString('ar-EG-u-nu-latn')}</td><td>${fmt(p.amount)}</td><td>${esc(p.cashboxes?.name||'')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
     ${await attachCard('invoice', id)}
     <div id="modal"></div>`, 'more');
   bindAttach('invoice', id, () => invoiceDetail(id));
@@ -1283,7 +1287,7 @@ async function supplyView(){
       <thead><tr><th>المرجع</th><th>العنوان</th><th>الطرف</th><th>التسليم المتوقع</th><th>الحالة</th><th></th></tr></thead>
       <tbody>${(srs||[]).map(s => `<tr><td dir="ltr" style="text-align:right">${esc(s.ref_no)}</td><td><b>${esc(s.title)}</b></td>
         <td>${esc((names[s.party_type]||{})[s.party_id]||'—')}</td>
-        <td>${s.expected_date ? new Date(s.expected_date).toLocaleDateString('ar-EG') : '—'}</td>
+        <td>${s.expected_date ? new Date(s.expected_date).toLocaleDateString('ar-EG-u-nu-latn') : '—'}</td>
         <td><span class="badge navy">${INV_STATUS[s.status]||s.status}</span></td>
         <td class="row-actions">${INV_NEXT[s.status] ? `<button data-next="${s.id}" data-to="${INV_NEXT[s.status]}">→ ${INV_STATUS[INV_NEXT[s.status]]}</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد طلبات توريد</td></tr>'}</tbody>
     </table></div>
@@ -1463,7 +1467,7 @@ async function movesView(){
   ]);
   const KINDS = { in:['دخول','green'], out:['خروج','red'], transfer_out:['تحويل خارج','navy'], transfer_in:['تحويل داخل','navy'], adjust:['تسوية جرد','navy'], waste:['تالف','red'], return_in:['مرتجع داخل','green'], return_out:['مرتجع خارج','red'] };
   const rows = (moves||[]).map(m => { const k = KINDS[m.kind]||[m.kind,'navy']; return `
-    <tr><td>${new Date(m.date).toLocaleDateString('ar-EG')}</td>
+    <tr><td>${new Date(m.date).toLocaleDateString('ar-EG-u-nu-latn')}</td>
     <td><span class="badge ${k[1]}">${k[0]}</span></td>
     <td><b>${esc(m.products?.name||'')}</b></td>
     <td>${esc(m.warehouses?.name||'')}</td>
@@ -1610,7 +1614,7 @@ function bindVoiceMic(fieldId){
   if(!btn || !SR) return;
   btn.onclick = () => {
     const rec = new SR();
-    rec.lang = 'ar-EG'; rec.interimResults = false;
+    rec.lang = 'ar-EG-u-nu-latn'; rec.interimResults = false;
     btn.textContent = '●…'; btn.disabled = true;
     rec.onresult = (ev) => {
       const text = Array.from(ev.results).map(r => r[0].transcript).join(' ');
@@ -2217,5 +2221,9 @@ async function render(){
   return dashView();
 }
 window.addEventListener('hashchange', render);
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(r=>r.update()).catch(()=>{});
+  let swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!swReloaded){ swReloaded = true; location.reload(); } });
+}
 boot();
