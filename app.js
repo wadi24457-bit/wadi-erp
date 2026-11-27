@@ -88,8 +88,54 @@ function loginView(){
   };
 }
 
+
+// Professional stroke icon set (translator style): 24x24, stroke currentColor
+const IC_PATHS = {
+  home:'M3 10.5 12 3l9 7.5M5 9.5V21h5v-6h4v6h5V9.5',
+  wallet:'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zM16 12h5v4h-5a2 2 0 0 1 0-4z',
+  users:'M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  clipboard:'M9 4h6v3H9zM7 4H5v17h14V4h-2M9 12h6M9 16h4',
+  grid:'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  sun:'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  moon:'M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z',
+  badge:'M5 4h14v16H5zM12 11a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM7.5 17c.6-2.4 2.2-3.5 4.5-3.5s3.9 1.1 4.5 3.5',
+  receipt:'M5 2h14v20l-3-2-2 2-2-2-2 2-2-2-3 2zM9 7h6M9 11h6M9 15h4',
+  box:'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
+  ship:'M3 16h18l-2 5H5zM5 16V8h14v8M12 8V2M8 5h8',
+  chart:'M3 21h18M7 17v-5M12 17V7M17 17v-9',
+  sparkles:'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z',
+  bell:'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  search:'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35',
+  camera:'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  paperclip:'M21.4 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 1 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48',
+  mic:'M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8',
+  alert:'M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01',
+  inbox:'M12 4v12M6 10l6 6 6-6M4 20h16',
+  outbox:'M12 16V4M6 10l6-6 6 6M4 20h16',
+  warehouse:'M3 21V9l9-6 9 6v12M7 21v-8h10v8M7 17h10',
+  refresh:'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15',
+  plus:'M12 5v14M5 12h14',
+  calendar:'M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+  trendup:'M23 6l-9.5 9.5-5-5L1 18M17 6h6v6',
+  image:'M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 15l-5-5L5 21',
+  file:'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
+  printer:'M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z',
+  cash:'M2 6h20v12H2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM5 9h.01M19 15h.01',
+  cart:'M9 22a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM20 22a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6',
+  factory:'M2 20h20M4 20V8l6 4V8l6 4V4h4v16',
+  bank:'M3 21h18M4 18h16M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2 2 8h20z',
+  book:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z',
+  folder:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z',
+  scale:'M12 4v16M8 20h8M5 7h14M5 7l-2.5 6a2.9 2.9 0 0 0 5 0zM19 7l-2.5 6a2.9 2.9 0 0 0 5 0z',
+  coins:'M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM18.09 10.37A6 6 0 1 1 10.34 18M7 6h1v4M16.71 13.88l.7.71-2.82 2.82',
+  clock:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
+  leaf:'M5 21C5 12 9 5 19 5c0 10-6 16-14 16zM5 21c3-6 7-10 12-12',
+  percent:'M19 5 5 19M6.5 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM17.5 20a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+};
+const I = Object.fromEntries(Object.entries(IC_PATHS).map(([k,p]) => [k, `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico" aria-hidden="true"><path d="${p}"/></svg>`]));
+
 const NAV = [
-  ['dash','الرئيسية','🏠'],['fin','المالية','💰'],['users','المستخدمون','👥'],['audit','السجل','📋'],['more','المزيد','⚙️']
+  ['dash','الرئيسية',I.home],['fin','المالية',I.wallet],['users','المستخدمون',I.users],['audit','السجل',I.clipboard],['more','المزيد',I.grid]
 ];
 function shell(content, active){
   const dark = localStorage.getItem('wadi-theme') === 'dark';
@@ -100,7 +146,7 @@ function shell(content, active){
       <img src="icon.svg" alt=""><b>WADI</b>
       <span style="font-size:.75rem;color:#94a3b8">${esc(profile.full_name)} · ${esc(ROLES[profile.role]||profile.role)}</span>
       <div class="spacer"></div>
-      <button id="themeBtn">${dark ? '☀️' : '🌙'}</button>
+      <button id="themeBtn">${dark ? I.sun : I.moon}</button>
       <button id="logoutBtn">خروج</button>
     </div>
     <main>${content}</main>
@@ -134,7 +180,7 @@ async function dashView(){
   const dateStr = new Date().toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
   const card = (k, v, cls='') => `<div class="card"><div class="k">${k}</div><div class="v ${cls}">${v === null ? '—' : v}</div></div>`;
   shell(`
-    <div class="page-title">${greet}، ${esc(profile.full_name.split(' ')[0])} 👋</div>
+    <div class="page-title">${greet}، ${esc(profile.full_name.split(' ')[0])}</div>
     <div style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">${dateStr}</div>
     <div class="cards">
       ${card('مبيعات اليوم', fmt(t.sales_today) + ' ج.م', 'em')}
@@ -148,7 +194,7 @@ async function dashView(){
     </div>
     ${lowItems.length ? `
     <div class="card" style="margin-top:1rem;border-color:#f59e0b">
-      <div class="k">⚠️ أصناف تحت حد الطلب (${lowItems.length})</div>
+      <div class="k">${I.alert} أصناف تحت حد الطلب (${lowItems.length})</div>
       <div class="tablewrap" style="margin-top:.5rem"><table>
         <thead><tr><th>الصنف</th><th>المخزن</th><th>المتاح</th><th>الحد</th></tr></thead>
         <tbody>${lowItems.map(p=>`<tr><td><b>${esc(p.name)}</b><br><span style="color:var(--muted);font-size:.75rem" dir="ltr">${esc(p.sku)}</span></td><td>${esc(p.warehouse_name)}</td><td>${fmt(p.on_hand)} ${esc(p.unit)}</td><td>${fmt(p.min_stock)}</td></tr>`).join('')}</tbody>
@@ -280,15 +326,15 @@ function moreView(){
       <div class="card"><div class="k">العملة الأساسية</div><div class="v" style="font-size:1rem">جنيه مصري (EGP)</div></div>
     </div>
     <div class="card" style="margin-top:1rem"><div class="k">الأقسام</div>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#hr" style="color:var(--emerald-d)">🧑‍💼 الموظفون والموارد البشرية والسلف ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#parties" style="color:var(--emerald-d)">🤝 العملاء والموردون وكشوف الحساب ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#trade" style="color:var(--emerald-d)">🧾 التوريد والمبيعات والمشتريات ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#inv" style="color:var(--emerald-d)">📦 المخازن والمخزون ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#ship" style="color:var(--emerald-d)">🚢 الاستيراد والتصدير والشحنات ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#rep" style="color:var(--emerald-d)">📊 مركز التقارير ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#ai" style="color:var(--emerald-d)">🤖 المساعد الذكي ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#notif" style="color:var(--emerald-d)">🔔 التنبيهات ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#search" style="color:var(--emerald-d)">🔍 البحث الشامل ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#hr" style="color:var(--emerald-d)">${I.badge} الموظفون والموارد البشرية والسلف ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#parties" style="color:var(--emerald-d)">${I.users} العملاء والموردون وكشوف الحساب ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#trade" style="color:var(--emerald-d)">${I.receipt} التوريد والمبيعات والمشتريات ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#inv" style="color:var(--emerald-d)">${I.box} المخازن والمخزون ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#ship" style="color:var(--emerald-d)">${I.ship} الاستيراد والتصدير والشحنات ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#rep" style="color:var(--emerald-d)">${I.chart} مركز التقارير ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#ai" style="color:var(--emerald-d)">${I.sparkles} المساعد الذكي ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#notif" style="color:var(--emerald-d)">${I.bell} التنبيهات ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#search" style="color:var(--emerald-d)">${I.search} البحث الشامل ←</a></p>
     </div>`, 'more');
 }
 
@@ -301,12 +347,12 @@ function finHome(){
   if(!can('accounting.view') && !can('treasury.manage'))
     return shell(`<div class="page-title">المالية</div><div class="empty">لا تملك صلاحية الوصول إلى المالية.</div>`, 'fin');
   const items = [
-    ['fin/vouchers','سندات القبض والصرف','🧾','treasury.manage','تسجيل المقبوضات والمدفوعات مع قيد محاسبي تلقائي'],
-    ['fin/expenses','المصروفات والميزانية','💸','expenses.view','مصروفات مصنّفة بمصدر دفع إلزامي ومقارنة بالميزانية'],
-    ['fin/cashboxes','الخزائن والبنوك','🏦','treasury.manage','إدارة الخزائن ومتابعة أرصدتها'],
-    ['fin/journals','القيود اليومية','📒','accounting.view','قيود مزدوجة مع اعتماد ومنع تعديل بعد الاعتماد'],
-    ['fin/accounts','دليل الحسابات','🗂️','accounting.view','شجرة الحسابات والأرصدة'],
-    ['fin/trial','ميزان المراجعة','⚖️','accounting.view','أرصدة كل الحسابات من القيود المعتمدة'],
+    ['fin/vouchers','سندات القبض والصرف',I.receipt,'treasury.manage','تسجيل المقبوضات والمدفوعات مع قيد محاسبي تلقائي'],
+    ['fin/expenses','المصروفات والميزانية',I.cash,'expenses.view','مصروفات مصنّفة بمصدر دفع إلزامي ومقارنة بالميزانية'],
+    ['fin/cashboxes','الخزائن والبنوك',I.bank,'treasury.manage','إدارة الخزائن ومتابعة أرصدتها'],
+    ['fin/journals','القيود اليومية',I.book,'accounting.view','قيود مزدوجة مع اعتماد ومنع تعديل بعد الاعتماد'],
+    ['fin/accounts','دليل الحسابات',I.folder,'accounting.view','شجرة الحسابات والأرصدة'],
+    ['fin/trial','ميزان المراجعة',I.scale,'accounting.view','أرصدة كل الحسابات من القيود المعتمدة'],
   ].filter(([, , , p]) => can(p));
   shell(`
     <div class="page-title">الحسابات والخزائن</div>
@@ -597,7 +643,7 @@ async function expensesView(){
     <td>${esc(e.category)}</td><td><b>${fmt(e.amount)} ${esc(e.currency)}</b></td>
     <td>${esc(e.cashboxes?.name||'—')}</td><td>${esc(e.responsible||'')}</td>
     <td style="font-size:.78rem;color:var(--muted)">${esc(e.notes||'')}</td>
-    <td class="row-actions"><button data-att="${e.id}" title="المرفقات">📎</button></td></tr>`).join('');
+    <td class="row-actions"><button data-att="${e.id}" title="المرفقات">${I.paperclip}</button></td></tr>`).join('');
   const cmpRows = (cmp||[]).map(b => {
     const pct = b.budget > 0 ? Math.round(b.actual / b.budget * 100) : 0;
     return `<tr><td>${esc(b.category)}</td><td>${money(b.budget)}</td><td>${money(b.actual)}</td>
@@ -688,10 +734,10 @@ function hrHome(){
   if(!can('hr.view') && !can('hr.manage') && !can('advances.manage'))
     return shell(`<div class="page-title">الموظفون</div><div class="empty">لا تملك صلاحية الوصول إلى الموارد البشرية.</div>`, 'more');
   const items = [
-    ['hr/employees','الموظفون','🧑‍💼','hr.view','البيانات والرواتب وحالة التوظيف'],
-    ['hr/attendance','الحضور والانصراف','🕐','hr.view','تسجيل حضور اليوم'],
-    ['hr/leaves','الإجازات','🌴','hr.view','طلبات الإجازة والموافقات'],
-    ['hr/advances','السلف والقروض','🤝','hr.view','طلب → اعتماد → صرف → أقساط'],
+    ['hr/employees','الموظفون',I.badge,'hr.view','البيانات والرواتب وحالة التوظيف'],
+    ['hr/attendance','الحضور والانصراف',I.clock,'hr.view','تسجيل حضور اليوم'],
+    ['hr/leaves','الإجازات',I.leaf,'hr.view','طلبات الإجازة والموافقات'],
+    ['hr/advances','السلف والقروض',I.coins,'hr.view','طلب → اعتماد → صرف → أقساط'],
   ].filter(([, , , p]) => can(p) || can('hr.manage'));
   shell(`
     <div class="page-title">الموظفون والموارد البشرية</div>
@@ -933,8 +979,8 @@ function partiesHome(){
   if(!can('parties.view') && !can('parties.manage'))
     return shell(`<div class="page-title">العملاء والموردون</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
   const items = [
-    ['parties/customers','العملاء','🤝','ملفات العملاء وأرصدتهم وكشوف الحساب'],
-    ['parties/suppliers','الموردون','🏭','ملفات الموردين المحليين والأجانب وكشوف الحساب'],
+    ['parties/customers','العملاء',I.users,'ملفات العملاء وأرصدتهم وكشوف الحساب'],
+    ['parties/suppliers','الموردون',I.factory,'ملفات الموردين المحليين والأجانب وكشوف الحساب'],
   ];
   shell(`
     <div class="page-title">العملاء والموردون</div>
@@ -1054,10 +1100,10 @@ function tradeHome(){
   if(!can('sales.manage') && !can('purchases.manage'))
     return shell(`<div class="page-title">المبيعات والمشتريات</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
   const items = [
-    ['trade/sales','فواتير المبيعات','🧾','sales.manage','فواتير وأوامر بيع بهامش ربح'],
-    ['trade/purchases','فواتير المشتريات','🛒','purchases.manage','فواتير وأوامر شراء'],
-    ['trade/quotes','عروض الأسعار','📄','sales.manage','عروض أسعار للعملاء'],
-    ['trade/supply','طلبات التوريد','📦','sales.manage','متابعة طلبات التوريد وحالاتها'],
+    ['trade/sales','فواتير المبيعات',I.receipt,'sales.manage','فواتير وأوامر بيع بهامش ربح'],
+    ['trade/purchases','فواتير المشتريات',I.cart,'purchases.manage','فواتير وأوامر شراء'],
+    ['trade/quotes','عروض الأسعار',I.file,'sales.manage','عروض أسعار للعملاء'],
+    ['trade/supply','طلبات التوريد',I.box,'sales.manage','متابعة طلبات التوريد وحالاتها'],
   ].filter(([, , , p]) => can(p));
   shell(`
     <div class="page-title">التوريد والمبيعات والمشتريات</div>
@@ -1168,7 +1214,7 @@ async function invoiceDetail(id){
       ${next && can(perm) ? `<button class="btn" id="nextSt">→ ${INV_STATUS[next]}</button>` : ''}
       ${inv.status!=='cancelled' && inv.status!=='completed' && can(perm) ? '<button class="btn ghost" id="cancelI">إلغاء المستند</button>' : ''}
       ${(inv.kind==='sale'||inv.kind==='purchase') && remain > 0 && can('treasury.manage') ? '<button class="btn" id="payI">تسجيل دفعة</button>' : ''}
-      <button class="btn ghost" onclick="window.print()">🖨️ طباعة / PDF</button>
+      <button class="btn ghost" onclick="window.print()">${I.printer} طباعة / PDF</button>
       <a class="btn ghost" href="#trade/${inv.kind==='quote'?'quotes':inv.kind==='sale'?'sales':'purchases'}">← رجوع</a>
     </div>
     <div id="msg"></div>
@@ -1272,10 +1318,10 @@ function invHome(){
   if(!can('inventory.view') && !can('inventory.manage'))
     return shell(`<div class="page-title">المخازن</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
   const items = [
-    ['inv/stock','المخزون الحالي','📊','inventory.view','الأرصدة والقيمة لكل مخزن'],
-    ['inv/products','الأصناف','📦','inventory.view','المنتجات والباركود والأسعار'],
-    ['inv/moves','حركات المخزون','🔄','inventory.view','دخول وخروج وتحويل وجرد وتالف'],
-    ['inv/warehouses','المخازن','🏬','inventory.view','إدارة المخازن'],
+    ['inv/stock','المخزون الحالي',I.chart,'inventory.view','الأرصدة والقيمة لكل مخزن'],
+    ['inv/products','الأصناف',I.box,'inventory.view','المنتجات والباركود والأسعار'],
+    ['inv/moves','حركات المخزون',I.refresh,'inventory.view','دخول وخروج وتحويل وجرد وتالف'],
+    ['inv/warehouses','المخازن',I.warehouse,'inventory.view','إدارة المخازن'],
   ].filter(([, , , p]) => can(p) || can('inventory.manage'));
   shell(`
     <div class="page-title">المخازن والمخزون</div>
@@ -1331,7 +1377,7 @@ async function productsView(){
     const low = p.min_stock > 0 && qty <= p.min_stock;
     return `<tr><td><b>${esc(p.name)}</b><br><span style="color:var(--muted);font-size:.78rem" dir="ltr">${esc(p.sku)}${p.barcode?' · '+esc(p.barcode):''}</span></td>
     <td>${esc(p.category||'—')}</td>
-    <td class="${low?'neg':''}">${fmt(qty)} ${esc(p.unit)}${low?' ⚠️':''}</td>
+    <td class="${low?'neg':''}">${fmt(qty)} ${esc(p.unit)}${low?' '+I.alert:''}</td>
     <td>${fmt(p.purchase_cost)}</td><td>${fmt(p.sale_price)}</td>
     <td class="row-actions">${can('inventory.manage')?`<button data-edit="${p.id}">تعديل</button>`:''}</td></tr>`;
   }).join('');
@@ -1391,7 +1437,7 @@ async function stockView(){
     const low = r.min_stock > 0 && Number(r.on_hand) <= Number(r.min_stock);
     return `<tr><td><b>${esc(r.name)}</b><br><span style="color:var(--muted);font-size:.75rem" dir="ltr">${esc(r.sku)}</span></td>
     <td>${esc(r.warehouse_name)}</td>
-    <td class="${low?'neg':''}">${fmt(r.on_hand)} ${esc(r.unit)}${low?' ⚠️':''}</td>
+    <td class="${low?'neg':''}">${fmt(r.on_hand)} ${esc(r.unit)}${low?' '+I.alert:''}</td>
     <td>${money(Number(r.on_hand)*Number(r.purchase_cost))}</td></tr>`;
   }).join('');
   const totalVal = (data||[]).reduce((s,r)=>s+Number(r.on_hand)*Number(r.purchase_cost),0);
@@ -1509,13 +1555,13 @@ async function attachCard(ownerType, ownerId){
       <div class="k">المرفقات (${(atts||[]).length})</div>
       <div id="attList" style="margin:.4rem 0">${(atts||[]).map(a => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border)">
-          <span style="font-size:.82rem">${a.file_url.endsWith('.pdf')?'📄':'🖼️'} ${esc(a.label||'مرفق')}</span>
+          <span style="font-size:.82rem">${a.file_url.endsWith('.pdf')?I.file:I.image} ${esc(a.label||'مرفق')}</span>
           <span><button class="btn ghost" data-view="${esc(a.id)}" style="padding:.2rem .6rem;font-size:.78rem">عرض</button>
           <button class="btn ghost" data-del="${esc(a.id)}" style="padding:.2rem .6rem;font-size:.78rem">حذف</button></span>
         </div>`).join('') || '<div style="font-size:.8rem;color:var(--muted)">لا توجد مرفقات — صوّر الفاتورة أو أرفق ملفاً.</div>'}</div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-        <button class="btn" id="attCam">📷 تصوير</button>
-        <button class="btn ghost" id="attFile">📎 إرفاق ملف</button>
+        <button class="btn" id="attCam">${I.camera} تصوير</button>
+        <button class="btn ghost" id="attFile">${I.paperclip} إرفاق ملف</button>
       </div>
       <input type="file" id="attCamIn" accept="image/*" capture="environment" style="display:none">
       <input type="file" id="attFileIn" accept="image/*,application/pdf" style="display:none">
@@ -1556,26 +1602,26 @@ function bindAttach(ownerType, ownerId, onChange){
   });
 }
 
-const voiceMicBtn = (fieldId) => SR ? `<button type="button" class="btn ghost" id="mic_${fieldId}" style="padding:.2rem .6rem;font-size:.85rem" title="إدخال صوتي">🎤</button>` : '';
+const voiceMicBtn = (fieldId) => SR ? `<button type="button" class="btn ghost" id="mic_${fieldId}" style="padding:.2rem .6rem;font-size:.85rem" title="إدخال صوتي">${I.mic}</button>` : '';
 function bindVoiceMic(fieldId){
   const btn = $(`#mic_${fieldId}`);
   if(!btn || !SR) return;
   btn.onclick = () => {
     const rec = new SR();
     rec.lang = 'ar-EG'; rec.interimResults = false;
-    btn.textContent = '🔴…'; btn.disabled = true;
+    btn.textContent = '●…'; btn.disabled = true;
     rec.onresult = (ev) => {
       const text = Array.from(ev.results).map(r => r[0].transcript).join(' ');
       const f = $(`#${fieldId}`);
       f.value = (f.value ? f.value + ' ' : '') + text;
     };
-    rec.onend = () => { btn.textContent = '🎤'; btn.disabled = false; };
-    rec.onerror = () => { btn.textContent = '🎤'; btn.disabled = false; };
+    rec.onend = () => { btn.innerHTML = I.mic; btn.disabled = false; };
+    rec.onerror = () => { btn.innerHTML = I.mic; btn.disabled = false; };
     rec.start();
   };
 }
 
-const scanBarcodeBtn = (fieldId) => hasCameraScan ? `<button type="button" class="btn ghost" id="scan_${fieldId}" style="padding:.2rem .6rem;font-size:.85rem" title="مسح الباركود بالكاميرا">📷 مسح</button>` : '';
+const scanBarcodeBtn = (fieldId) => hasCameraScan ? `<button type="button" class="btn ghost" id="scan_${fieldId}" style="padding:.2rem .6rem;font-size:.85rem" title="مسح الباركود بالكاميرا">${I.camera} مسح</button>` : '';
 function bindBarcodeScan(fieldId){
   const btn = $(`#scan_${fieldId}`);
   if(!btn || !hasCameraScan) return;
@@ -1620,10 +1666,10 @@ function shipHome(){
   sb.from('v_shipments_delayed').select('*').then(({ data: delayed }) => {
     shell(`
       <div class="page-title">الاستيراد والتصدير</div>
-      ${(delayed||[]).length ? `<div class="msg err">⚠️ ${(delayed||[]).length} شحنة متأخرة عن موعد الوصول المتوقع</div>` : ''}
+      ${(delayed||[]).length ? `<div class="msg err">${I.alert} ${(delayed||[]).length} شحنة متأخرة عن موعد الوصول المتوقع</div>` : ''}
       <div class="cards">
-        <a href="#ship/list" class="card link-card"><div style="font-size:1.6rem">🚢</div><div class="k" style="font-size:1rem;color:var(--text)">الشحنات</div><div style="font-size:.78rem;color:var(--muted)">تسجيل ومتابعة الشحنات الدولية</div></a>
-        <a href="#ship/new" class="card link-card"><div style="font-size:1.6rem">➕</div><div class="k" style="font-size:1rem;color:var(--text)">شحنة جديدة</div><div style="font-size:.78rem;color:var(--muted)">استيراد أو تصدير</div></a>
+        <a href="#ship/list" class="card link-card"><div class="big-ic">${I.ship}</div><div class="k" style="font-size:1rem;color:var(--text)">الشحنات</div><div style="font-size:.78rem;color:var(--muted)">تسجيل ومتابعة الشحنات الدولية</div></a>
+        <a href="#ship/new" class="card link-card"><div class="big-ic">${I.plus}</div><div class="k" style="font-size:1rem;color:var(--text)">شحنة جديدة</div><div style="font-size:.78rem;color:var(--muted)">استيراد أو تصدير</div></a>
       </div>
       <div class="toolbar"><a class="btn ghost" href="#more">← المزيد</a></div>`, 'more');
   });
@@ -1647,8 +1693,8 @@ async function shipmentsView(){
           <span class="badge ${s.status==='completed'?'emerald':'navy'}">${esc(SHIP_STATUS[s.status]||s.status)}</span>
         </div>
         <div style="font-size:.82rem;color:var(--muted);margin-top:.3rem">
-          ${s.kind==='import'?'استيراد 📥':'تصدير 📤'} · ${esc(s.origin_country||'')} → ${esc(s.dest_country||'')}
-          ${s.is_delayed ? ' · <b class="neg">متأخرة ⚠️</b>' : ''}
+          ${s.kind==='import'?`استيراد ${I.inbox}`:`تصدير ${I.outbox}`} · ${esc(s.origin_country||'')} → ${esc(s.dest_country||'')}
+          ${s.is_delayed ? ` · <b class="neg">متأخرة ${I.alert}</b>` : ''}
         </div>
         <div style="font-size:.82rem;margin-top:.2rem">
           ${esc(s.foreign_party||'')} ${s.container_no?('· <span dir="ltr">'+esc(s.container_no)+'</span>'):''}
@@ -1735,14 +1781,14 @@ async function shipDetail(id){
   const canEdit = can('trade.manage') && !s.received_at && s.status !== 'cancelled';
   const nextStatus = SHIP_FLOW[SHIP_FLOW.indexOf(s.status)+1];
   shell(`
-    <div class="page-title">شحنة ${esc(s.ref_no)} ${s.is_delayed?'<span class="badge" style="background:#7f1d1d;color:#fff">متأخرة ⚠️</span>':''}</div>
+    <div class="page-title">شحنة ${esc(s.ref_no)} ${s.is_delayed?`<span class="badge" style="background:#7f1d1d;color:#fff">متأخرة ${I.alert}</span>`:''}</div>
     <div class="toolbar">
       ${canEdit ? `<a class="btn ghost" href="#ship/edit/${s.id}">تعديل البيانات</a>` : ''}
       <a class="btn ghost" href="#ship/list">← الشحنات</a>
     </div>
     <div id="msg"></div>
     <div class="card">
-      <div class="k">${s.kind==='import'?'استيراد 📥':'تصدير 📤'} · <span class="badge ${s.status==='completed'?'emerald':'navy'}">${esc(SHIP_STATUS[s.status]||s.status)}</span></div>
+      <div class="k">${s.kind==='import'?`استيراد ${I.inbox}`:`تصدير ${I.outbox}`} · <span class="badge ${s.status==='completed'?'emerald':'navy'}">${esc(SHIP_STATUS[s.status]||s.status)}</span></div>
       <div style="font-size:.85rem;margin-top:.4rem;line-height:1.9">
         ${esc(s.origin_country||'—')} → ${esc(s.dest_country||'—')} · ${esc(s.incoterm||'')}
         <br>الطرف الأجنبي: ${esc(s.foreign_party||'—')}
@@ -1854,20 +1900,20 @@ const repTable = (headers, rows) => `<div class="tablewrap"><table><thead><tr>${
   <tbody>${rows.length ? rows.map(r => '<tr>' + r.map((c,i) => `<td>${i===0?esc(c):c}</td>`).join('') + '</tr>').join('') : `<tr><td colspan="${headers.length}" class="empty">لا توجد بيانات</td></tr>`}</tbody></table></div>`;
 
 const REPORTS = {
-  'profit-daily':   { t: 'الأرباح اليومية',  i: '📈' },
-  'profit-monthly': { t: 'الأرباح الشهرية',  i: '📊' },
-  'profit-yearly':  { t: 'الأرباح السنوية',  i: '🗓️' },
-  'expenses':       { t: 'المصروفات',        i: '💸' },
-  'sales':          { t: 'المبيعات',         i: '🧾' },
-  'purchases':      { t: 'المشتريات',        i: '🛒' },
-  'customers':      { t: 'العملاء',          i: '🤝' },
-  'suppliers':      { t: 'الموردون',         i: '🏭' },
-  'inventory':      { t: 'المخزون',          i: '📦' },
-  'employees':      { t: 'أداء الموظفين والمستحقات', i: '🧑‍💼' },
-  'advances':       { t: 'السلف',            i: '💳' },
-  'cashflow':       { t: 'التدفقات النقدية', i: '💰' },
-  'shipments':      { t: 'الشحنات',          i: '🚢' },
-  'taxes':          { t: 'الضرائب',          i: '🏛️' },
+  'profit-daily':   { t: 'الأرباح اليومية',  i: I.trendup },
+  'profit-monthly': { t: 'الأرباح الشهرية',  i: I.chart },
+  'profit-yearly':  { t: 'الأرباح السنوية',  i: I.calendar },
+  'expenses':       { t: 'المصروفات',        i: I.cash },
+  'sales':          { t: 'المبيعات',         i: I.receipt },
+  'purchases':      { t: 'المشتريات',        i: I.cart },
+  'customers':      { t: 'العملاء',          i: I.users },
+  'suppliers':      { t: 'الموردون',         i: I.factory },
+  'inventory':      { t: 'المخزون',          i: I.box },
+  'employees':      { t: 'أداء الموظفين والمستحقات', i: I.badge },
+  'advances':       { t: 'السلف',            i: I.coins },
+  'cashflow':       { t: 'التدفقات النقدية', i: I.wallet },
+  'shipments':      { t: 'الشحنات',          i: I.ship },
+  'taxes':          { t: 'الضرائب',          i: I.percent },
 };
 
 function reportsHome(){
@@ -1933,7 +1979,7 @@ async function reportView(kind){
     const totV = (vals||[]).reduce((a,r)=>a+Number(r.value||0),0);
     extra = `<div class="card" style="margin:.5rem 0"><div class="k">إجمالي قيمة المخزون</div><div class="v em">${M(totV)}</div></div>`;
     headers = ['الصنف','المخزن','الرصيد','التكلفة','القيمة'];
-    rows = (data||[]).filter(r=>Number(r.on_hand)!==0).map(r => [r.name, r.warehouse_name, `${fmt(r.on_hand)} ${esc(r.unit)}${r.min_stock>0&&r.on_hand<=r.min_stock?' ⚠️':''}`, fmt(r.purchase_cost), M(r.on_hand*r.purchase_cost)]);
+    rows = (data||[]).filter(r=>Number(r.on_hand)!==0).map(r => [r.name, r.warehouse_name, `${fmt(r.on_hand)} ${esc(r.unit)}${r.min_stock>0&&r.on_hand<=r.min_stock?' (منخفض)':''}`, fmt(r.purchase_cost), M(r.on_hand*r.purchase_cost)]);
   } else if(kind === 'employees'){
     const { data } = await sb.from('v_employee_dues').select('*');
     headers = ['الموظف','الوظيفة','سلف مفتوحة','متبقي السلف'];
@@ -2019,7 +2065,7 @@ function aiView(){
   if(!can('reports.view')) return shell(`<div class="page-title">المساعد الذكي</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
   const CHIPS = ['كم أرباح هذا الشهر؟','أكبر 5 مصروفات','من أكثر العملاء مديونية؟','ما الأصناف التي قاربت على النفاد؟','ما مستحقات الموظفين؟','ما الشحنات المتأخرة؟','فواتير غير مدفوعة'];
   shell(`
-    <div class="page-title">المساعد الذكي 🤖</div>
+    <div class="page-title">المساعد الذكي ${I.sparkles}</div>
     <div style="font-size:.8rem;color:var(--muted);margin-bottom:.5rem">يجيب من بيانات الشركة الفعلية فقط, ويعرض المصدر وطريقة الحساب.</div>
     <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem">${CHIPS.map(c=>`<button class="btn ghost chip" data-q="${esc(c)}" style="font-size:.78rem">${esc(c)}</button>`).join('')}</div>
     <div style="display:flex;gap:.4rem">
@@ -2051,14 +2097,14 @@ async function notifView(){
     sb.from('v_budget_compare').select('*').eq('month', new Date().toISOString().slice(0,7)),
   ]);
   const items = [];
-  (delayed.data||[]).forEach(x => items.push(['🚢','تأخر شحنة', `${x.ref_no} — كان متوقعاً ${x.eta}`, '#ship/id/'+x.id]));
-  (low.data||[]).forEach(p => items.push(['📦','انخفاض المخزون', `${p.name} — ${fmt(p.on_hand)} ${p.unit} في ${p.warehouse_name}`, '#inv/stock']));
-  (unpaid.data||[]).filter(r=>r.days_overdue > 0).forEach(r => items.push(['🧾','فاتورة متأخرة السداد', `${r.ref_no} — ${r.party_name||''} — ${money(r.remaining_base)} (متأخرة ${fmt(r.days_overdue)} يوم)`, '#trade/invoice/'+r.id]));
-  (pendAdv.data||[]).forEach(a => items.push(['💳','طلب سلفة جديد', `${a.ref_no} — ${a.employees?.name||''} — ${money(a.amount)}`, '#hr/advances']));
-  (budget.data||[]).filter(b=>b.budget>0 && b.actual>b.budget).forEach(b => items.push(['💸','تجاوز الميزانية', `${b.category} — الفعلي ${money(b.actual)} من ${money(b.budget)}`, '#fin/expenses']));
+  (delayed.data||[]).forEach(x => items.push([I.ship,'تأخر شحنة', `${x.ref_no} — كان متوقعاً ${x.eta}`, '#ship/id/'+x.id]));
+  (low.data||[]).forEach(p => items.push([I.box,'انخفاض المخزون', `${p.name} — ${fmt(p.on_hand)} ${p.unit} في ${p.warehouse_name}`, '#inv/stock']));
+  (unpaid.data||[]).filter(r=>r.days_overdue > 0).forEach(r => items.push([I.receipt,'فاتورة متأخرة السداد', `${r.ref_no} — ${r.party_name||''} — ${money(r.remaining_base)} (متأخرة ${fmt(r.days_overdue)} يوم)`, '#trade/invoice/'+r.id]));
+  (pendAdv.data||[]).forEach(a => items.push([I.coins,'طلب سلفة جديد', `${a.ref_no} — ${a.employees?.name||''} — ${money(a.amount)}`, '#hr/advances']));
+  (budget.data||[]).filter(b=>b.budget>0 && b.actual>b.budget).forEach(b => items.push([I.cash,'تجاوز الميزانية', `${b.category} — الفعلي ${money(b.actual)} من ${money(b.budget)}`, '#fin/expenses']));
   const largeExp = await sb.from('expenses').select('ref_no,category,amount,fx_rate,date').is('deleted_at', null)
     .gte('date', new Date(Date.now()-7*864e5).toISOString().slice(0,10)).order('amount',{ascending:false}).limit(20);
-  (largeExp.data||[]).filter(e=>e.amount*e.fx_rate >= 10000).forEach(e => items.push(['⚠️','مصروف كبير هذا الأسبوع', `${e.category} — ${money(e.amount*e.fx_rate)} (${e.date})`, '#fin/expenses']));
+  (largeExp.data||[]).filter(e=>e.amount*e.fx_rate >= 10000).forEach(e => items.push([I.alert,'مصروف كبير هذا الأسبوع', `${e.category} — ${money(e.amount*e.fx_rate)} (${e.date})`, '#fin/expenses']));
   shell(`
     <div class="page-title">التنبيهات (${items.length})</div>
     ${items.length ? `<div class="cards">${items.map(([i,t,d,h]) => `
