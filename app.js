@@ -276,13 +276,14 @@ function moreView(){
   shell(`
     <div class="page-title">المزيد</div>
     <div class="cards">
-      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٦ — المبيعات والمشتريات والتوريد</div></div>
+      <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٧ — المخازن والمخزون</div></div>
       <div class="card"><div class="k">العملة الأساسية</div><div class="v" style="font-size:1rem">جنيه مصري (EGP)</div></div>
     </div>
     <div class="card" style="margin-top:1rem"><div class="k">الأقسام</div>
       <p style="margin-top:.4rem;font-size:.9rem"><a href="#hr" style="color:var(--emerald-d)">🧑‍💼 الموظفون والموارد البشرية والسلف ←</a></p>
       <p style="margin-top:.4rem;font-size:.9rem"><a href="#parties" style="color:var(--emerald-d)">🤝 العملاء والموردون وكشوف الحساب ←</a></p>
       <p style="margin-top:.4rem;font-size:.9rem"><a href="#trade" style="color:var(--emerald-d)">🧾 التوريد والمبيعات والمشتريات ←</a></p>
+      <p style="margin-top:.4rem;font-size:.9rem"><a href="#inv" style="color:var(--emerald-d)">📦 المخازن والمخزون ←</a></p>
       <p style="margin-top:.4rem;font-size:.9rem;color:var(--muted)">قريباً: العملاء والموردون · المبيعات والمشتريات · المخازن · الاستيراد والتصدير · التقارير</p>
     </div>`, 'more');
 }
@@ -1246,6 +1247,224 @@ async function supplyView(){
   });
 }
 
+/* ---------- INVENTORY (phase 7) ---------- */
+function invHome(){
+  if(!can('inventory.view') && !can('inventory.manage'))
+    return shell(`<div class="page-title">المخازن</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  const items = [
+    ['inv/stock','المخزون الحالي','📊','inventory.view','الأرصدة والقيمة لكل مخزن'],
+    ['inv/products','الأصناف','📦','inventory.view','المنتجات والباركود والأسعار'],
+    ['inv/moves','حركات المخزون','🔄','inventory.view','دخول وخروج وتحويل وجرد وتالف'],
+    ['inv/warehouses','المخازن','🏬','inventory.view','إدارة المخازن'],
+  ].filter(([, , , p]) => can(p) || can('inventory.manage'));
+  shell(`
+    <div class="page-title">المخازن والمخزون</div>
+    <div class="cards">
+      ${items.map(([h,t,i,,d]) => `<a href="#${h}" class="card link-card"><div style="font-size:1.6rem">${i}</div><div class="k" style="font-size:1rem;color:var(--text)">${t}</div><div style="font-size:.78rem;color:var(--muted)">${d}</div></a>`).join('')}
+    </div>`, 'more');
+}
+
+async function warehousesView(){
+  if(!can('inventory.view') && !can('inventory.manage')) return shell(`<div class="page-title">المخازن</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">المخازن</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const [{ data: whs }, { data: vals }] = await Promise.all([
+    sb.from('warehouses').select('*').is('deleted_at', null).order('name'),
+    sb.from('v_stock_value').select('*'),
+  ]);
+  const byId = Object.fromEntries((vals||[]).map(v=>[v.warehouse_id, v]));
+  shell(`
+    <div class="page-title">المخازن</div>
+    <div class="toolbar">
+      ${can('inventory.manage') ? '<button class="btn" id="addW">+ مخزن جديد</button>' : ''}
+      <a class="btn ghost" href="#inv">← المخازن والمخزون</a>
+    </div>
+    <div id="msg"></div>
+    <div class="cards">${(whs||[]).map(w=>{ const v = byId[w.id]||{}; return `
+      <div class="card"><div class="k">${esc(w.name)}</div>
+      <div style="font-size:.85rem;color:var(--muted)">أصناف: ${fmt(v.total_qty||0)} · القيمة: <b class="em">${money(v.value||0)}</b></div></div>`; }).join('') || ''}</div>
+    ${!(whs||[]).length ? '<div class="empty">لا توجد مخازن بعد</div>' : ''}
+    <div id="modal"></div>`, 'more');
+  if(can('inventory.manage')) $('#addW').onclick = () => {
+    $('#modal').innerHTML = `
+    <div class="modal-bg"><div class="modal"><h3>مخزن جديد</h3><div id="mmsg"></div>
+      <div class="field"><label>الاسم</label><input id="w_name" placeholder="مثال: المخزن الرئيسي"></div>
+      <button class="btn" id="saveW">حفظ</button>
+      <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    $('#saveW').onclick = async () => {
+      const { error } = await sb.from('warehouses').insert({ name: $('#w_name').value.trim(), created_by: session.user.id });
+      if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+      $('#modal').innerHTML = ''; warehousesView();
+    };
+  };
+}
+
+async function productsView(){
+  if(!can('inventory.view') && !can('inventory.manage')) return shell(`<div class="page-title">الأصناف</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">الأصناف</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const { data: prods } = await sb.from('products').select('*').is('deleted_at', null).order('created_at', {ascending:false});
+  const { data: inv } = await sb.from('v_inventory').select('*');
+  const onHand = {};
+  (inv||[]).forEach(r => { onHand[r.product_id] = (onHand[r.product_id]||0) + Number(r.on_hand||0); });
+  const rows = (prods||[]).map(p => {
+    const qty = onHand[p.id]||0;
+    const low = p.min_stock > 0 && qty <= p.min_stock;
+    return `<tr><td><b>${esc(p.name)}</b><br><span style="color:var(--muted);font-size:.78rem" dir="ltr">${esc(p.sku)}${p.barcode?' · '+esc(p.barcode):''}</span></td>
+    <td>${esc(p.category||'—')}</td>
+    <td class="${low?'neg':''}">${fmt(qty)} ${esc(p.unit)}${low?' ⚠️':''}</td>
+    <td>${fmt(p.purchase_cost)}</td><td>${fmt(p.sale_price)}</td>
+    <td class="row-actions">${can('inventory.manage')?`<button data-edit="${p.id}">تعديل</button>`:''}</td></tr>`;
+  }).join('');
+  shell(`
+    <div class="page-title">الأصناف</div>
+    <div class="toolbar">
+      ${can('inventory.manage') ? '<button class="btn" id="addPr">+ صنف جديد</button>' : ''}
+      <a class="btn ghost" href="#inv">← المخازن والمخزون</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>الصنف</th><th>الفئة</th><th>المتاح</th><th>تكلفة الشراء</th><th>سعر البيع</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" class="empty">لا توجد أصناف بعد</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'more');
+  if(can('inventory.manage')){
+    $('#addPr').onclick = () => prodForm(null);
+    document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => prodForm((prods||[]).find(p=>p.id===b.dataset.edit)));
+  }
+}
+
+function prodForm(p){
+  $('#modal').innerHTML = `
+  <div class="modal-bg"><div class="modal"><h3>${p?'تعديل صنف':'صنف جديد'}</h3><div id="mmsg"></div>
+    <div class="field"><label>الاسم</label><input id="pr_name" value="${esc(p?.name||'')}"></div>
+    <div class="field"><label>SKU</label><input id="pr_sku" dir="ltr" value="${esc(p?.sku||'')}" placeholder="يُنشأ تلقائياً إذا تُرك فارغاً"></div>
+    <div class="field"><label>الباركود</label><input id="pr_bar" dir="ltr" value="${esc(p?.barcode||'')}"></div>
+    <div class="field"><label>الفئة</label><input id="pr_cat" value="${esc(p?.category||'')}"></div>
+    <div class="field"><label>وحدة القياس</label><input id="pr_unit" value="${esc(p?.unit||'قطعة')}"></div>
+    <div class="field"><label>الحد الأدنى (تنبيه)</label><input id="pr_min" type="number" min="0" step="0.01" dir="ltr" value="${p?.min_stock||0}"></div>
+    <div class="field"><label>تكلفة الشراء</label><input id="pr_cost" type="number" min="0" step="0.01" dir="ltr" value="${p?.purchase_cost||0}"></div>
+    <div class="field"><label>سعر البيع</label><input id="pr_price" type="number" min="0" step="0.01" dir="ltr" value="${p?.sale_price||0}"></div>
+    <button class="btn" id="savePr">حفظ</button>
+    <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
+  $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+  $('#savePr').onclick = async () => {
+    const body = { name: $('#pr_name').value.trim(), barcode: $('#pr_bar').value.trim() || null,
+      category: $('#pr_cat').value.trim() || null, unit: $('#pr_unit').value.trim() || 'قطعة',
+      min_stock: Number($('#pr_min').value)||0, purchase_cost: Number($('#pr_cost').value)||0, sale_price: Number($('#pr_price').value)||0 };
+    let error;
+    if(p){ ({ error } = await sb.from('products').update(body).eq('id', p.id)); }
+    else {
+      body.sku = $('#pr_sku').value.trim() || ('SKU-' + Date.now().toString(36).toUpperCase());
+      ({ error } = await sb.from('products').insert({...body, created_by: session.user.id}));
+    }
+    if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    $('#modal').innerHTML = ''; productsView();
+  };
+}
+
+async function stockView(){
+  if(!can('inventory.view') && !can('inventory.manage')) return shell(`<div class="page-title">المخزون</div><div class="empty">لا تملك الصلاحية.</div>`, 'more');
+  shell(`<div class="page-title">المخزون الحالي</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const { data } = await sb.from('v_inventory').select('*').order('name');
+  const rows = (data||[]).filter(r=>Number(r.on_hand)!==0).map(r => {
+    const low = r.min_stock > 0 && Number(r.on_hand) <= Number(r.min_stock);
+    return `<tr><td><b>${esc(r.name)}</b><br><span style="color:var(--muted);font-size:.75rem" dir="ltr">${esc(r.sku)}</span></td>
+    <td>${esc(r.warehouse_name)}</td>
+    <td class="${low?'neg':''}">${fmt(r.on_hand)} ${esc(r.unit)}${low?' ⚠️':''}</td>
+    <td>${money(Number(r.on_hand)*Number(r.purchase_cost))}</td></tr>`;
+  }).join('');
+  const totalVal = (data||[]).reduce((s,r)=>s+Number(r.on_hand)*Number(r.purchase_cost),0);
+  shell(`
+    <div class="page-title">المخزون الحالي</div>
+    <div class="toolbar"><a class="btn ghost" href="#inv">← المخازن والمخزون</a></div>
+    <div class="cards" style="margin-bottom:1rem"><div class="card"><div class="k">إجمالي قيمة المخزون (بالتكلفة)</div><div class="v em">${money(totalVal)}</div></div></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>الصنف</th><th>المخزن</th><th>الرصيد</th><th>القيمة</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" class="empty">لا يوجد مخزون بعد — تُسجَّل الأرصدة تلقائياً من فواتير الشراء والبيع وحركات المخزون</td></tr>'}</tbody>
+    </table></div>`, 'more');
+}
+
+async function movesView(){
+  if(!can('inventory.manage')) return shell(`<div class="page-title">حركات المخزون</div><div class="empty">لا تملك صلاحية إدارة المخازن.</div>`, 'more');
+  shell(`<div class="page-title">حركات المخزون</div><div class="center"><span class="spin"></span></div>`, 'more');
+  const [{ data: moves }, { data: prods }, { data: whs }] = await Promise.all([
+    sb.from('stock_moves').select('*, products(name,sku,unit), warehouses(name)').is('deleted_at', null).order('created_at', {ascending:false}).limit(100),
+    sb.from('products').select('id,name,unit').is('deleted_at', null),
+    sb.from('warehouses').select('*').is('deleted_at', null),
+  ]);
+  const KINDS = { in:['دخول','green'], out:['خروج','red'], transfer_out:['تحويل خارج','navy'], transfer_in:['تحويل داخل','navy'], adjust:['تسوية جرد','navy'], waste:['تالف','red'], return_in:['مرتجع داخل','green'], return_out:['مرتجع خارج','red'] };
+  const rows = (moves||[]).map(m => { const k = KINDS[m.kind]||[m.kind,'navy']; return `
+    <tr><td>${new Date(m.date).toLocaleDateString('ar-EG')}</td>
+    <td><span class="badge ${k[1]}">${k[0]}</span></td>
+    <td><b>${esc(m.products?.name||'')}</b></td>
+    <td>${esc(m.warehouses?.name||'')}</td>
+    <td>${fmt(Math.abs(m.qty))} ${esc(m.products?.unit||'')}</td>
+    <td style="font-size:.78rem;color:var(--muted)">${esc(m.notes||'')}</td></tr>`; }).join('');
+  shell(`
+    <div class="page-title">حركات المخزون</div>
+    <div class="toolbar">
+      <button class="btn" id="addM">+ حركة يدوية</button>
+      ${(whs||[]).length > 1 ? '<button class="btn ghost" id="addT">تحويل بين المخازن</button>' : ''}
+      <a class="btn ghost" href="#inv">← المخازن والمخزون</a>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>التاريخ</th><th>النوع</th><th>الصنف</th><th>المخزن</th><th>الكمية</th><th>ملاحظات</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" class="empty">لا توجد حركات بعد</td></tr>'}</tbody>
+    </table></div>
+    <div id="modal"></div>`, 'more');
+  const guard = () => {
+    if(!(prods||[]).length){ $('#msg').innerHTML = `<div class="msg err">أضف أصنافاً أولاً.</div>`; return false; }
+    if(!(whs||[]).length){ $('#msg').innerHTML = `<div class="msg err">أضف مخزناً أولاً.</div>`; return false; }
+    return true;
+  };
+  $('#addM').onclick = () => {
+    if(!guard()) return;
+    $('#modal').innerHTML = `
+    <div class="modal-bg"><div class="modal"><h3>حركة مخزون يدوية</h3><div id="mmsg"></div>
+      <div class="field"><label>النوع</label><select id="m_kind"><option value="in">دخول</option><option value="out">خروج</option><option value="adjust">تسوية جرد (+/-)</option><option value="waste">تالف</option></select></div>
+      <div class="field"><label>الصنف</label><select id="m_prod">${prods.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>المخزن</label><select id="m_wh">${whs.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>الكمية</label><input id="m_qty" type="number" step="0.01" dir="ltr"></div>
+      <div class="field"><label>تكلفة الوحدة (للدخول)</label><input id="m_cost" type="number" min="0" step="0.01" dir="ltr" value="0"></div>
+      <div class="field"><label>ملاحظات</label><input id="m_notes"></div>
+      <button class="btn" id="saveM">حفظ</button>
+      <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    $('#saveM').onclick = async () => {
+      const { error } = await sb.from('stock_moves').insert({
+        kind: $('#m_kind').value, product_id: $('#m_prod').value, warehouse_id: $('#m_wh').value,
+        qty: Number($('#m_qty').value)||0, unit_cost: Number($('#m_cost').value)||0,
+        notes: $('#m_notes').value.trim(), created_by: session.user.id });
+      if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+      $('#modal').innerHTML = ''; movesView();
+    };
+  };
+  const tBtn = $('#addT'); if(tBtn) tBtn.onclick = () => {
+    if(!guard()) return;
+    const tid = crypto.randomUUID();
+    $('#modal').innerHTML = `
+    <div class="modal-bg"><div class="modal"><h3>تحويل بين المخازن</h3><div id="mmsg"></div>
+      <div class="field"><label>الصنف</label><select id="t_prod">${prods.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>من مخزن</label><select id="t_from">${whs.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>إلى مخزن</label><select id="t_to">${whs.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>الكمية</label><input id="t_qty" type="number" min="0" step="0.01" dir="ltr"></div>
+      <button class="btn" id="saveT">تنفيذ التحويل</button>
+      <button class="btn ghost" id="closeModal" style="margin-top:.4rem">إلغاء</button></div></div>`;
+    $('#closeModal').onclick = () => $('#modal').innerHTML = '';
+    $('#saveT').onclick = async () => {
+      if($('#t_from').value === $('#t_to').value){ $('#mmsg').innerHTML = `<div class="msg err">اختر مخزنين مختلفين.</div>`; return; }
+      const qty = Number($('#t_qty').value)||0;
+      const { error } = await sb.from('stock_moves').insert([
+        { kind:'transfer_out', product_id: $('#t_prod').value, warehouse_id: $('#t_from').value, qty, transfer_id: tid, notes:'تحويل', created_by: session.user.id },
+        { kind:'transfer_in', product_id: $('#t_prod').value, warehouse_id: $('#t_to').value, qty, transfer_id: tid, notes:'تحويل', created_by: session.user.id },
+      ]);
+      if(error){ $('#mmsg').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+      $('#modal').innerHTML = ''; movesView();
+    };
+  };
+}
+
 async function callFn(action, payload = {}){
   const res = await fetch(`${SUPA_URL}/functions/v1/admin-users`, {
     method: 'POST',
@@ -1296,6 +1515,13 @@ async function render(){
     if(sub === 'supply') return supplyView();
     if(sub === 'invoice') return invoiceDetail(parts[2]);
     return tradeHome();
+  }
+  if(root === 'inv'){
+    if(sub === 'warehouses') return warehousesView();
+    if(sub === 'products') return productsView();
+    if(sub === 'moves') return movesView();
+    if(sub === 'stock') return stockView();
+    return invHome();
   }
   return dashView();
 }
