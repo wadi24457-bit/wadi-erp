@@ -200,6 +200,7 @@ const TIPS = {
 };
 const tipKey = () => { const p=(location.hash||'#dash').slice(1).split('/'); return TIPS[p.slice(0,2).join('/')] ? p.slice(0,2).join('/') : p[0]; };
 function shell(content, active){
+  if(!localStorage.getItem('wadi-theme-v18')){ localStorage.removeItem('wadi-theme'); localStorage.setItem('wadi-theme-v18','1'); }
   const dark = localStorage.getItem('wadi-theme') !== 'light';
   document.documentElement.dataset.theme = dark ? 'dark' : '';
   app.innerHTML = `
@@ -395,17 +396,8 @@ function moreView(){
       <div class="card"><div class="k">النسخة</div><div class="v" style="font-size:1rem">مرحلة ٩ — التقارير والمساعد الذكي</div></div>
       <div class="card"><div class="k">العملة الأساسية</div><div class="v" style="font-size:1rem">جنيه مصري (EGP)</div></div>
     </div>
-    <div class="card" style="margin-top:1rem"><div class="k">الأقسام</div>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#hr" style="color:var(--emerald-d)">${I.badge} الموظفون والموارد البشرية والسلف ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#parties" style="color:var(--emerald-d)">${I.users} العملاء والموردون وكشوف الحساب ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#trade" style="color:var(--emerald-d)">${I.receipt} التوريد والمبيعات والمشتريات ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#inv" style="color:var(--emerald-d)">${I.box} المخازن والمخزون ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#ship" style="color:var(--emerald-d)">${I.ship} الاستيراد والتصدير والشحنات ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#rep" style="color:var(--emerald-d)">${I.chart} مركز التقارير ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#ai" style="color:var(--emerald-d)">${I.sparkles} المساعد الذكي ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#notif" style="color:var(--emerald-d)">${I.bell} التنبيهات ←</a></p>
-      <p style="margin-top:.4rem;font-size:.9rem"><a href="#search" style="color:var(--emerald-d)">${I.search} البحث الشامل ←</a></p>
-    </div>`, 'more');
+    <div class="k" style="margin:1rem 0 .6rem;font-size:.9rem;font-weight:800">الأقسام</div>
+    <div class="tiles"><a href="#hr" class="tile"><span class="big-ic">${I.badge}</span><span>الموظفون</span></a><a href="#parties" class="tile"><span class="big-ic">${I.users}</span><span>العملاء والموردون</span></a><a href="#trade" class="tile"><span class="big-ic">${I.receipt}</span><span>الفواتير</span></a><a href="#inv" class="tile"><span class="big-ic">${I.box}</span><span>المخازن</span></a><a href="#ship" class="tile"><span class="big-ic">${I.ship}</span><span>الشحنات</span></a><a href="#rep" class="tile"><span class="big-ic">${I.chart}</span><span>التقارير</span></a><a href="#ai" class="tile"><span class="big-ic">${I.sparkles}</span><span>المساعد الذكي</span></a><a href="#notif" class="tile"><span class="big-ic">${I.bell}</span><span>التنبيهات</span></a><a href="#search" class="tile"><span class="big-ic">${I.search}</span><span>البحث</span></a></div></div>`, 'more');
 }
 
 /* ---------- FINANCE (phase 3) ---------- */
