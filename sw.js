@@ -1,4 +1,4 @@
-const CACHE = 'wadi-erp-v17';
+const CACHE = 'wadi-erp-v18';
 const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'icon.svg', 'manifest.json'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
