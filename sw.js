@@ -1,4 +1,4 @@
-const CACHE = 'wadi-erp-v18';
+const CACHE = 'wadi-erp-v19';
 const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'icon.svg', 'manifest.json'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -14,7 +14,7 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   // network-first: always pick up new deployments; fall back to cache offline
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request,{cache:'no-cache'}).then(r => {
       const copy = r.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return r;

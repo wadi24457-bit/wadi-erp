@@ -2282,7 +2282,7 @@ async function render(){
   return dashView();
 }
 window.addEventListener('hashchange', render);
-const SW_VER = 'v18';
+const SW_VER = 'v19';
 if('serviceWorker' in navigator){
   // versioned URL + updateViaCache:'none': old clients always fetch a fresh sw.js
   navigator.serviceWorker.register('sw.js?'+SW_VER, {updateViaCache:'none'}).then(r=>{ r.update(); setInterval(()=>r.update(), 30*60*1000); }).catch(()=>{});
